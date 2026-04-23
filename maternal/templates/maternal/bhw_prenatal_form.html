@@ -1,0 +1,19 @@
+{% extends "base.html" %} 
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/mhr-theme.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mt-5">
+    <h1 class="mb-3">Pre-natal Follow-up Entry</h1>
+    {% include 'messages.html' %}
+    {% include 'maternal/partial/prenatal_logs_and_entry.html' %}
+</div>
+{% endblock %}
+
+{% block js %}
+{{ block.super }}
+<script src="{% static 'maternal/js/prenatalApi.js' %}"></script>
+{% endblock %}

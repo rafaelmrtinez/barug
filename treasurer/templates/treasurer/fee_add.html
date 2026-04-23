@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  :root{
+    --brand:#7a1212; --brand-100:#fdebed; --brand-200:#f9dfe2; --accent:#b45151;
+    --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --card:#ffffff; --wash:#fafbfc;
+  }
+  body{ background:var(--wash); }
+  .page{ max-width: 940px; margin: 0 auto; }
+  .group{ background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: 0 8px 16px rgba(17,24,39,.04); }
+  .group + .group{ margin-top: 14px; }
+  .group-title{ font-weight: 600; color: var(--ink); background: var(--brand-100); border: 1px solid var(--brand-200);
+    padding: 8px 12px; border-radius: 10px; display:inline-flex; align-items:center; gap:.5rem; margin-bottom: 12px; }
+  .helper{ font-size:.85rem; color:var(--muted); }
+  .form-label{ font-weight:600; color:var(--ink); }
+  .form-control:focus,.form-select:focus{ border-color:var(--accent); box-shadow:0 0 0 .18rem rgba(180,81,81,.15); }
+  .choices{ display:flex; flex-wrap:wrap; gap:10px; }
+  .chip{ position:relative; }
+  .chip input{ position:absolute; opacity:0; inset:0; cursor:pointer; }
+  .chip label{ user-select:none; cursor:pointer; display:inline-flex; align-items:center; gap:.5rem; background:#fff; border:1px solid var(--line); border-radius:999px; padding:.5rem .9rem; color:var(--ink); }
+  .chip input:checked + label{ border-color:var(--accent); background:var(--brand-100); }
+  .chip label .dot{ width:10px;height:10px;border-radius:50%; border:2px solid var(--accent); }
+  .chip input:checked + label .dot{ background:var(--accent); }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); }
+  .btn-primary:hover{ background:#a04646; border-color:#a04646; }
+  .btn-outline-secondary{ border-color: var(--accent); color: var(--accent); }
+  .btn-outline-secondary:hover{ background: var(--brand-100); color: var(--accent); }
+</style>
+
+<div class="container page py-4" style="margin-top: 40px;">
+  <!-- <h4 class="mb-3">Add Fee (Add as NEW Document Type)</h4> -->
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <!-- NEW Document Type -->
+    <div class="group">
+      <div class="group-title">New Document Type</div>
+      <label class="form-label">New document type name</label>
+      <input type="text" class="form-control" name="doc_type_name_new" placeholder="e.g., CERTIFICATE OF EMPLOYMENT" required>
+      <div class="helper mt-2">This creates a new document type entry then adds the fee under it.</div>
+    </div>
+
+    <!-- Fee Basics -->
+    <div class="group">
+      <div class="group-title">Fee Basics</div>
+      <input type="hidden" name="unit" value="per_doc">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Fee Code</label>
+          <input type="text" class="form-control" name="fee_code" placeholder="e.g., CERT_EMPLOYMENT" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Current Amount</label>
+          <input type="number" step="0.01" class="form-control" name="current_amount" placeholder="e.g., 150" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Fee Name</label>
+          <input type="text" class="form-control" name="fee_name" placeholder="e.g., Certificate of Employment – Issuance" required>
+        </div>
+        <div class="col-12">
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+            <label class="form-check-label" for="is_active">Active</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exemptions -->
+    <div class="group">
+      <div class="group-title">Exemptions (optional)</div>
+      <div class="choices">
+        <div class="chip">
+          <input type="checkbox" id="ex_senior" name="ex_senior">
+          <label for="ex_senior"><span class="dot"></span> Senior</label>
+        </div>
+        <div class="chip">
+          <input type="checkbox" id="ex_pwd" name="ex_pwd">
+          <label for="ex_pwd"><span class="dot"></span> PWD</label>
+        </div>
+        <div class="chip">
+          <input type="checkbox" id="ex_student" name="ex_student">
+          <label for="ex_student"><span class="dot"></span> Student</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reason -->
+    <div class="group">
+      <div class="group-title">Reason / Note</div>
+      <input type="text" class="form-control" name="reason" placeholder="Initial create">
+      <div class="helper mt-1">Used for audit trail.</div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmModal">Save Fee</button>
+      <a href="{% url 'treasurer:fees' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmModalLabel">Confirm Save Fee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to save this fee?</p>
+        <!-- <div class="mt-2">
+          <strong>Document Type:</strong> <span id="confirmDocType"></span><br>
+          <strong>Fee Code:</strong> <span id="confirmFeeCode"></span><br>
+          <strong>Fee Name:</strong> <span id="confirmFeeName"></span><br>
+          <strong>Amount:</strong> ₱<span id="confirmAmount"></span>
+        </div> -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmSaveBtn">Confirm Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.querySelector('form');
+  const confirmModal = document.getElementById('confirmModal');
+  const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+  
+  // Populate modal with form values when shown
+  confirmModal.addEventListener('show.bs.modal', function() {
+    const docType = form.querySelector('[name="doc_type_name_new"]').value || 'N/A';
+    const feeCode = form.querySelector('[name="fee_code"]').value || 'N/A';
+    const feeName = form.querySelector('[name="fee_name"]').value || 'N/A';
+    const amount = form.querySelector('[name="current_amount"]').value || '0';
+    
+    document.getElementById('confirmDocType').textContent = docType;
+    document.getElementById('confirmFeeCode').textContent = feeCode;
+    document.getElementById('confirmFeeName').textContent = feeName;
+    document.getElementById('confirmAmount').textContent = parseFloat(amount).toFixed(2);
+  });
+  
+  // Submit form when confirmed
+  confirmSaveBtn.addEventListener('click', function() {
+    form.submit();
+  });
+});
+</script>
+{% endblock %}

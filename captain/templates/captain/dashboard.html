@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load humanize %}
+
+{% block css %}
+<style>
+/* ───────── Theme (BARUG maroon) ───────── */
+.dashboard.theme-barug{
+  --brand-900:#3a1217;
+  --brand-800:#561c24;
+  --brand-700:#6d2932;  /* primary */
+  --brand-600:#6d2932;
+  --brand-500:#561c24;
+  --brand-400:#c7b7a3;
+  --brand-300:#e8d8c4;  /* area fill */
+  --brand-200:#f3ece3;
+  --brand-100:#fbf7f4;
+
+  --neutral-800:#1f2937;
+  --neutral-600:#4b5563;
+  --neutral-500:#6b7280; /* axis text */
+  --neutral-400:#9ca3af;
+  --neutral-300:#d1d5db; /* grid */
+  --neutral-200:#e5e7eb;
+  --neutral-100:#f3f4f6;
+
+  --surface:#ffffff;
+  --surface-muted:#faf9f7;
+  --border:#ece7e1;
+  --shadow:0 8px 24px rgba(15,23,42,.06);
+}
+
+/* ───────── Base / perf ───────── */
+.dashboard .card{ border-radius:16px; border:1px solid var(--border); }
+.dashboard .shadow-sm{ box-shadow:var(--shadow)!important; }
+.dashboard .btn,.dashboard .form-select,.dashboard .form-control{ border-radius:12px; }
+.header-card,.kpi{ content-visibility:auto; contain-intrinsic-size:300px 400px; }
+.section.chart-section{ content-visibility:visible; }
+
+/* Header */
+.header-card{ background:linear-gradient(135deg,var(--brand-100),#fff); }
+.eyebrow{ letter-spacing:.12em; font-size:.72rem; color:var(--brand-700); }
+
+/* Buttons */
+.btn-brand{ background:var(--brand-700); color:#fff; border:1px solid var(--brand-700); }
+.btn-brand:hover{ background:var(--brand-800); color:#fff; }
+.btn-outline-brand{ color:var(--brand-700); border:1px solid var(--brand-700); background:transparent; }
+.btn-outline-brand:hover{ background:var(--brand-100); color:var(--brand-800); }
+.btn-brand-subtle{ background:var(--brand-300); color:var(--brand-800); border:1px solid var(--brand-300); }
+.btn-brand-subtle:hover{ background:var(--brand-200); }
+
+/* KPI */
+.kpi .kpi-icon{
+  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
+  background:var(--brand-300); color:var(--brand-700);
+}
+.kpi .kpi-label{ font-size:.82rem; color:var(--neutral-600); font-weight:600; }
+.kpi .kpi-value{ font-size:2rem; font-weight:800; line-height:1; }
+.kpi .kpi-sub{ font-size:.8rem; font-weight:700; }
+.kpi .kpi-pill{ background:var(--brand-200); color:var(--brand-800); border:1px solid var(--brand-300); }
+
+/* Sections */
+.section .card-header{ background:var(--surface-muted); border-bottom:1px solid var(--border); padding:.85rem 1rem; }
+
+/* Charts */
+.chart-wrap{ position:relative; height:clamp(320px, 40vh, 520px); }
+.chart-wrap canvas{ width:100% !important; height:100% !important; display:block; }
+.legend-inline{ display:flex; gap:1rem; flex-wrap:wrap; }
+.legend-inline .legend-dot{
+  width:.9rem;height:.9rem;border-radius:50%;display:inline-block;margin-right:.35rem;
+  background:var(--dot,var(--brand-600));
+}
+.legend-inline .legend-label{ margin-right:.75rem; font-size:.9rem; color:var(--neutral-600); }
+
+.hidden{ display:none!important; }
+
+/* Motion */
+.lift-on-hover{ transition:transform .18s ease, box-shadow .18s ease; }
+.lift-on-hover:hover{ transform:translateY(-2px); box-shadow:0 10px 28px rgba(15,23,42,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard theme-barug container-fluid py-4" style="margin-top:40">
+
+  <!-- Page Header -->
+  <div class="row g-3 align-items-center mb-3">
+    <div class="col-12">
+      <div class="card header-card shadow-sm">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <div class="eyebrow text-uppercase">Barangay Captain</div>
+            <h1 class="h4 mb-0 fw-bold">Overview</h1>
+            <div class="text-muted small mt-1">{{ today|default:"" }}</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'captain:incident_heatmap' %}" class="btn btn-outline-brand">
+              {% bs_icon 'geo-alt' %}<span class="ms-1">Incident Heatmap</span>
+            </a>
+            <a href="{% url 'captain:financial_report' %}" class="btn btn-brand-subtle">
+              {% bs_icon 'megaphone' %}<span class="ms-1">Financial Report</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'file-text' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Barangay Cases</div>
+            <div class="kpi-value" id="kpiOpenCases" title="Ongoing lupon cases.">{{ kpis.ongoing_cases|default_if_none:"-" }} <span class="kpi-sub">Ongoing Cases</span></div>
+            <div class="kpi-sub" id="kpiOpenCasesDelta" title="Open lupon cases.">{{ kpis.open_cases|default_if_none:"-" }} Open Cases</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Registered Residents</div>
+            <div class="kpi-value">{{ kpis.residents_total|default_if_none:"-" }}</div>
+            <span class="kpi-sub" title="Registered residents added this month.">+{{ kpis.new_residents_month|default_if_none:"-" }} this month</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'cash' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Collections This Week</div>
+            <div class="kpi-value" id="kpiCollectionsMonth">{{ kpis.collections_this_week|default_if_none:"-"|floatformat:2|intcomma }}</div>
+            <span class="kpi-sub" id="kpiCollectionsMonthDelta" title="Collections today.">+{{ kpis.collections_this_week_delta|default_if_none:"-"|floatformat:2|intcomma }} today</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'cash-stack' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Collections This Year</div>
+            <div class="kpi-value" id="kpiCollectionsYear">{{ kpis.collections_this_year|default_if_none:"-"|floatformat:2|intcomma }}</div>
+            <span class="kpi-sub" id="kpiCollectionsYearDelta" title="Collections this month.">+{{ kpis.collections_this_year_delta|default_if_none:"-"|floatformat:2|intcomma }} this month</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Announcements Section -->
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      {% include 'announcement/in_app_announcement.html' %}
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="row g-3 mt-1">
+    <div class="col-6">
+      <div class="card section chart-section shadow-sm h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Case Nature Distribution</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap">
+            <canvas id="casesNature"></canvas>
+            <div class="skeleton chart-skel-cases"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6">
+      <div class="card section chart-section shadow-sm h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Collections — Per Month</h5>
+          <span class="small text-muted">Current Year</span>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap">
+            <canvas id="collectionsPerMonth"></canvas>
+            <div class="skeleton chart-skel-status"></div>
+          </div>
+          <div class="legend-inline mt-3" id="collectionsLegend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if dashboard_json %}
+    {{ dashboard_json|json_script:"dash-data" }}
+  {% endif %}
+
+<script src="{% static 'js/dashboard-charts.js' %}"></script>
+<script>
+  (function(){
+    const dashEl = document.getElementById('dash-data');
+    const parsed = dashEl ? JSON.parse(dashEl.textContent) : null;
+    ChartUtils.renderDashboardFromJSON(parsed || {});
+  })();
+</script>
+
+</div>
+{% endblock %}

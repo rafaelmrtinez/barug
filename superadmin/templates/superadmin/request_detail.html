@@ -1,0 +1,379 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--bs-danger-text-emphasis);
+    border-radius: 2px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid var(--bs-danger-text-emphasis);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 2;
+}
+
+.timeline-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 3px solid var(--bs-danger-text-emphasis);
+    transition: all 0.3s ease;
+}
+
+.timeline-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 60px; padding-top: 1rem; padding-bottom: 0.5rem;">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-9">
+      
+      <!-- Header Card -->
+      <div class="card border-0 shadow-sm mb-3" style="border-radius: 14px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3" style="width: 70px; height: 70px;">
+              <div class="d-flex align-items-center justify-content-center text-white rounded-circle shadow-sm" style="width: 100%; height: 100%; font-size: 24px; font-weight: 600; background: var(--bs-danger-text-emphasis);">
+                {{ request.full_name|first|upper }}{% if request.full_name|wordcount > 1 %}{{ request.full_name|slice:"-1:"|first|upper }}{% endif %}
+              </div>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <h4 class="mb-2 fw-bold text-dark">{{ request.full_name }}</h4>
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="text-muted fw-medium">{{ request.person_code|default:"No Code" }}</span>
+                  </div>
+                  <div class="mb-0">
+                    <span class="badge px-2 py-1 rounded-pill {% if request.latest_request_status_id == 46 %}bg-info text-secondary{% elif request.latest_request_status_id == 29 %}bg-primary{% elif request.latest_request_status_id == 30 %}bg-info{% elif request.latest_request_status_name|upper == 'APPROVED' %}bg-success{% elif request.latest_request_status_id == 4 %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ request.latest_request_status_name|default:"PENDING" }}</span>
+                  </div>
+                </div>
+                <button class="btn btn-sm px-3 py-2 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#detailsSection" aria-expanded="false" aria-controls="detailsSection" style="background: transparent; color: var(--bs-danger-text-emphasis); border: 2px solid var(--bs-danger-text-emphasis); border-radius: 20px; transition: all 0.3s ease;" onmouseover="this.style.background='var(--bs-danger-text-emphasis)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--bs-danger-text-emphasis)'">
+                  {% bs_icon 'eye' size='1em' %} <span class="ms-1">Show Details</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Information Cards Grid -->
+      <div class="collapse" id="detailsSection">
+      <div class="row g-3 mb-3">
+        <!-- Personal Information -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark">Personal Information</h6>
+              </div>
+              
+              <!-- Address Card -->
+              <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 mt-1">
+                    {% bs_icon 'geo-alt-fill' color='#6c757d' %}
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="text-muted fw-medium mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Home Address</div>
+                    <div class="text-dark fw-medium">{{ request.home_address|default:"Not Provided" }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Personal Details Grid -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'person-badge' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Gender</span>
+                    </div>
+                    <div class="text-dark fw-bold">{{ request.sex_name|default:"Not Provided" }}</div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'calendar-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Birth Date</span>
+                    </div>
+                    <div class="text-dark fw-bold">{% if request.birthdate %}{{ request.birthdate|date:"M d, Y" }}{% else %}Not Provided{% endif %}</div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'heart-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Civil Status</span>
+                    </div>
+                    <div class="text-dark fw-bold">{{ request.civil_status_name|default:"Not Provided" }}</div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'flag-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Nationality</span>
+                    </div>
+                    <div class="text-dark fw-bold">{{ request.nationality_name|default:"Not Provided" }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Contact Info -->
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'envelope-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Email</span>
+                    </div>
+                    {% if request.email_address %}
+                      <div class="text-dark fw-bold">
+                        <a href="mailto:{{ request.email_address }}" class="text-decoration-none">{{ request.email_address }}</a>
+                      </div>
+                    {% else %}
+                      <div class="text-muted fw-semibold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'telephone-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Mobile</span>
+                    </div>
+                    {% if request.mobile_number %}
+                      <div class="text-dark fw-bold">{{ request.mobile_number }}</div>
+                    {% else %}
+                      <div class="text-muted fw-semibold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Staff Information & Documents -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'briefcase-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark">Requested Staff Information</h6>
+              </div>
+              
+              <!-- Staff Details -->
+              <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="d-flex align-items-start">
+                  <div class="me-2 mt-1">
+                    {% bs_icon 'briefcase' color='#6c757d' size='0.9em' %}
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Role</div>
+                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">{{ request.role_name|default:"Not Provided" }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              {% if request.role_name == 'Barangay Health Worker' %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'geo-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Purok/Sitio</div>
+                      <div class="{% if request.purok_names_pretty %}text-dark fw-bold{% else %}text-muted fw-semibold{% endif %}" style="white-space:pre-line; font-size: 0.9rem;">{{ request.purok_names_pretty|default:"Not Assigned" }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              {% if request.role_name == 'Barangay Lupon Member' %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'clock-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Schedule</div>
+                      <div class="{% if request.schedule_names_pretty %}text-dark fw-bold{% else %}text-muted fw-semibold{% endif %}" style="white-space:pre-line; font-size: 0.9rem;">{{ request.schedule_names_pretty|default:"Not Assigned" }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <!-- Documents Section -->
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'file-earmark-text-fill' color='var(--bs-danger-text-emphasis)' size='1.1em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark" style="font-size: 0.95rem;">Supporting Documents</h6>
+              </div>
+              
+              <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">ID Type</div>
+                <div class="text-dark fw-bold" style="font-size: 0.9rem;">{{ request.id_type_name|default:"Not Provided"|upper }}</div>
+              </div>
+              
+              {% if request.valid_id_front_img_path or request.valid_id_back_img_path or request.selfie_img_path %}
+                <div class="doc-carousel carousel slide mb-3" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+                  <div class="carousel-inner">
+                    {% if request.valid_id_front_img_path %}
+                      <div class="carousel-item active">
+                        <div class="img-wrap">
+                          <img src="{{ request.valid_id_front_img_path }}" class="doc-img" alt="ID Front">
+                        </div>
+                        <small class="text-muted d-block text-center mt-2 fw-medium">ID Front</small>
+                      </div>
+                    {% endif %}
+                    {% if request.valid_id_back_img_path %}
+                      <div class="carousel-item {% if not request.valid_id_front_img_path %}active{% endif %}">
+                        <div class="img-wrap">
+                          <img src="{{ request.valid_id_back_img_path }}" class="doc-img" alt="ID Back">
+                        </div>
+                        <small class="text-muted d-block text-center mt-2 fw-medium">ID Back</small>
+                      </div>
+                    {% endif %}
+                    {% if request.selfie_img_path %}
+                      <div class="carousel-item {% if not request.valid_id_front_img_path and not request.valid_id_back_img_path %}active{% endif %}">
+                        <div class="img-wrap">
+                          <img src="{{ request.selfie_img_path }}" class="doc-img" alt="Selfie">
+                        </div>
+                        <small class="text-muted d-block text-center mt-2 fw-medium">Selfie with ID</small>
+                      </div>
+                    {% endif %}
+                  </div>
+                  <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                  </button>
+                  <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                  </button>
+                </div>
+              {% endif %}
+              
+              <div class="p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="text-muted fw-medium" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
+                  {% if request.proof_of_employment_path %}
+                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
+                      <a href="{{ request.proof_of_employment_path }}" target="_blank" rel="noopener" class="text-decoration-none">Open</a>
+                    </div>
+                  {% else %}
+                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
+                      <span class="text-muted">Not Provided</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- Status History -->
+      {% if history %}
+      <div class="card border-0 shadow-sm mb-3" style="border-radius: 14px;">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center mb-3">
+            {% bs_icon 'clock-history' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+            <h6 class="mb-0 ms-2 fw-bold text-dark">Status History</h6>
+          </div>
+          
+          <div class="timeline">
+            {% for status in history %}
+            <div class="timeline-item">
+              <div class="timeline-card">
+                <h6 class="mb-2 fw-bold text-dark">{{ status.request_status_name }}</h6>
+                {% if status.approved_by_name %}
+                <div class="d-flex align-items-center mb-2">
+                  {% bs_icon 'person-check-fill' color='var(--bs-danger-text-emphasis)' size='0.9em' %}
+                  <small class="text-muted ms-2">
+                    By: <strong>{{ status.approved_by_name }}</strong>
+                  </small>
+                </div>
+                <div class="d-flex align-items-center mb-2">
+                  {% bs_icon 'calendar3' color='var(--bs-danger-text-emphasis)' size='0.9em' %}
+                  <small class="text-muted ms-2">
+                    {{ status.approval_date|date:"M d, Y H:i" }}
+                  </small>
+                </div>
+                {% endif %}
+                {% if status.remarks %}
+                <div class="mt-2 p-2 rounded" style="background: white; border-left: 3px solid var(--bs-danger-text-emphasis);">
+                  <small class="text-muted d-block mb-1">Remarks:</small>
+                  <em class="text-dark">{{ status.remarks }}</em>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Back Button -->
+      <div class="mb-3 text-end">
+        <a href="{% url 'superadmin:staff_requests_list' %}" class="btn btn-reset px-3 py-2">
+          {% bs_icon 'arrow-left' %} Back to Requests
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const toggleBtn = document.querySelector('[data-bs-target="#detailsSection"]');
+  const detailsSection = document.getElementById('detailsSection');
+  
+  detailsSection.addEventListener('show.bs.collapse', function() {
+    toggleBtn.innerHTML = '{% bs_icon "eye-slash" size="1em" %} <span class="ms-1">Hide Details</span>';
+  });
+  
+  detailsSection.addEventListener('hide.bs.collapse', function() {
+    toggleBtn.innerHTML = '{% bs_icon "eye" size="1em" %} <span class="ms-1">Show Details</span>';
+  });
+});
+</script>
+{% endblock %}

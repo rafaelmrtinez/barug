@@ -1,0 +1,901 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<style>
+  /* ───────── Brand tokens (flat, no gradients) ───────── */
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;
+    --brand-400:#c7b7a3;
+    --brand-200:#f3ece3;
+
+    --ink-900:#1f2328;  /* headings */
+    --ink-700:#343a40;  /* text */
+    --ink-500:#6c757d;  /* muted */
+    --line:#e5e7eb;     /* borders */
+    --bg:#fafafa;       /* page */
+    --white:#ffffff;
+  }
+
+  body{ background: var(--bg); }
+
+  /* Section panel (flat) */
+  .panel{
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: .75rem;
+  }
+  .panel--bar{
+    border: 2px solid var(--brand-800);
+  }
+  .section-head{
+    padding: .9rem 1rem;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+    color: var(--ink-900);
+    letter-spacing:.2px;
+  }
+  .section-body{ padding: 1rem; }
+
+  /* Focus states (brand) */
+  .form-control:focus,
+  .form-select:focus{
+    border-color: var(--brand-800);
+    box-shadow: 0 0 0 .25rem rgba(86,28,36,.15);
+  }
+
+  /* Buttons (flat) */
+  .btn-brand{
+    --bs-btn-bg: var(--brand-700);
+    --bs-btn-border-color: var(--brand-700);
+    --bs-btn-hover-bg: var(--brand-800);
+    --bs-btn-hover-border-color: var(--brand-800);
+    --bs-btn-active-bg: var(--brand-900);
+    --bs-btn-active-border-color: var(--brand-900);
+    color: #fff;
+  }
+  .btn-outline-brand{
+    --bs-btn-color: var(--brand-800);
+    --bs-btn-border-color: var(--brand-800);
+    --bs-btn-hover-bg: var(--brand-800);
+    --bs-btn-hover-border-color: var(--brand-800);
+    --bs-btn-hover-color: #fff;
+  }
+
+  /* Labels & help */
+  .label-req::after{ content:" *"; color:#dc3545; }
+  .help{ color: var(--ink-500); font-size:.875rem; }
+
+  /* Resident search results */
+  #residentResults .result{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.6rem .75rem; border:1px solid var(--line); border-radius:.5rem; margin-bottom:.5rem;
+    background:#fff;
+  }
+  #residentResults .result:hover{ border-color: var(--brand-400); }
+  #residentSpinner .spinner-border{ width:1rem; height:1rem; }
+
+  /* Two-column split */
+  .layout{
+    display:grid; grid-template-columns: 1fr; gap:1rem;
+  }
+  @media (min-width: 992px){
+    .layout{ grid-template-columns: 1.4fr .8fr; }
+    .aside-sticky{ position: sticky; top: 72px; }
+  }
+
+  /* Summary card */
+  .summary-list{ margin:0; padding:0; list-style:none; }
+  .summary-list li{
+    display:flex; justify-content:space-between; gap:.75rem;
+    padding:.5rem 0; border-bottom:1px dashed var(--line);
+  }
+  .summary-list li:last-child{ border-bottom:0; }
+  .summary-key{ color:var(--ink-500); }
+  .summary-val{ color:var(--ink-900); font-weight:500; }
+
+  /* Sticky actions on mobile */
+  @media (max-width: 575.98px){
+    .sticky-actions{
+      position: sticky; bottom:0; z-index:100; padding:.75rem; margin-left:-.75rem; margin-right:-.75rem;
+      background:#fff; border-top:1px solid var(--line);
+    }
+  }
+
+  .d-hidden{ display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3" margin>
+
+  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" enctype="multipart/form-data" autocomplete="off">
+    {% csrf_token %}
+
+    <div id="formAlert" class="alert alert-danger d-hidden" role="alert"></div>
+
+    <div class="layout">
+      <!-- ===== LEFT: Main form ===== -->
+      <div class="stack">
+        <!-- Resident search -->
+        <section class="panel panel--bar mb-3" id="residentSearchPanel">
+          <div class="section-head">Find Resident</div>
+          <div class="section-body">
+            <div class="row g-2 align-items-center">
+              <div class="col-sm-9 col-md-7">
+                <div class="position-relative">
+                  <label for="residentSearch" class="form-label label-req mb-1">Search</label>
+                  <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name (min 2 chars)" autocomplete="off">
+                  <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Searching"></div>
+                  </div>
+                </div>
+                <div class="help mt-1">Type at least 2 characters. Click a result to select.</div>
+              </div>
+            </div>
+            <div id="residentResults" class="mt-3 help">Waiting for input…</div>
+          </div>
+        </section>
+
+        <!-- Selected requester & on-behalf -->
+        <section class="panel panel--bar mb-3">
+          <div class="section-head">Requester</div>
+          <div class="section-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+              <div>
+                <div class="help">Selected Resident</div>
+                <div id="resident_label" class="fw-semibold">— none selected —</div>
+              </div>
+              <button class="btn btn-sm btn-outline-brand d-hidden" type="button" id="changeResidentBtn">Change</button>
+            </div>
+            <input type="hidden" id="requested_by_person_id" name="requested_by_person_id">
+
+            <hr class="my-3">
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf">
+              <label class="form-check-label" for="is_on_behalf">File on behalf of another resident</label>
+            </div>
+
+            <div id="onBehalfRow" class="row g-3 mt-1 d-hidden">
+              <div class="col-12">
+                <label class="form-label label-req">Find person (on behalf of)</label>
+                <input type="search" id="onBehalfSearch" class="form-control" placeholder="Search by name or code (min 2 chars)" autocomplete="off">
+                <div id="onBehalfSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
+                  <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                </div>
+                <div id="onBehalfResults" class="mt-2 help">Type to search…</div>
+              </div>
+              <div class="col-12 d-hidden" id="onBehalfSelected">
+                <div class="alert alert-info mb-0">
+                  <strong>Selected:</strong> <span id="onBehalfLabel">—</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary float-end" id="clearOnBehalf">Change</button>
+                </div>
+                <input type="hidden" name="on_behalf_of_person_id" id="on_behalf_of_person_id">
+              </div>
+              <div class="col-12">
+                <label class="form-label label-req">Authorization Letter</label>
+                <input type="file" class="form-control" id="authLetter" name="auth_letter" accept="image/*,.pdf">
+                <div class="help mt-1">Upload a signed authorization letter (JPG, PNG, or PDF)</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Document & Purpose -->
+        <section class="panel panel--bar mb-3">
+          <div class="section-head">Document & Purpose</div>
+          <div class="section-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label label-req" for="reqDocType">Document Type</label>
+                <select class="form-select" id="reqDocType" name="request_document_type_id" required>
+                  <option value="">— choose —</option>
+                  {% for dt in doc_types %}
+                    <option value="{{ dt.request_document_type_id }}">{{ dt.request_document_type_name }}</option>
+                  {% endfor %}
+                </select>
+                <div class="help">Purposes will load after selecting a document.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label label-req" for="purposeSelect">Purpose</label>
+                <select class="form-select" id="purposeSelect" name="line_document_purpose_id[]" disabled required>
+                  <option value="">— select document first —</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Business (owner) — for Barangay Business Clearance and Certified True Copy (CTC) -->
+            <div class="row g-3 mt-1 d-hidden" id="businessRow">
+              <div class="col-12">
+                <label class="form-label label-req" for="businessSelect">Business (owner)</label>
+                <select class="form-select" id="businessSelect">
+                  <option value="">— select resident first —</option>
+                </select>
+                <div class="help">This list shows businesses owned by the selected resident.</div>
+                <!-- Hidden field the server expects -->
+                <input type="hidden" name="business_id" id="business_id">
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-6 col-md-2">
+                <input id="qtyInput" class="form-control" type="number" min="1" value="1" name="line_quantity[]" required hidden>
+              </div>
+              <div class="col-6 col-md-3" id="offenseWrap">
+                <input id="offenseInput" class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto" hidden>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notes -->
+        <section class="panel panel--bar mb-4">
+          <div class="section-head">Notes</div>
+          <div class="section-body">
+            <label class="form-label" for="notesArea">Notes to Treasurer/Clerk (optional)</label>
+            <textarea id="notesArea" class="form-control" rows="2" name="purpose_notes" placeholder="Any remarks…"></textarea>
+          </div>
+        </section>
+
+        <div class="d-flex gap-2 sticky-actions">
+          <a class="btn btn-outline-brand" href="{% url 'clerk:queue' %}">Cancel</a>
+          <button id="submitBtn" class="btn btn-brand">
+            <span class="btn-label">Create Request</span>
+            <span class="btn-spinner d-hidden"><span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Submitting…</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== RIGHT: Sticky summary ===== -->
+      <aside class="aside-sticky">
+        <section class="panel panel--bar">
+          <div class="section-head">Summary</div>
+          <div class="section-body">
+            <ul class="summary-list">
+              <li><span class="summary-key">Requester</span><span id="sumRequester" class="summary-val">—</span></li>
+              <li><span class="summary-key">On-behalf</span><span id="sumBehalf" class="summary-val">—</span></li>
+              <li><span class="summary-key">Business</span><span id="sumBiz" class="summary-val">—</span></li>
+              <li><span class="summary-key">Document</span><span id="sumDoc" class="summary-val">—</span></li>
+              <li><span class="summary-key">Purpose</span><span id="sumPurpose" class="summary-val">—</span></li>
+              <li><span class="summary-key">Qty</span><span id="sumQty" class="summary-val">1</span></li>
+              <!-- <li><span class="summary-key">Offense</span><span id="sumOffense" class="summary-val">auto</span></li> -->
+            </ul>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </form>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true" style="margin-top:40px">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: var(--brand-700); color: white;">
+        <h5 class="modal-title" id="confirmModalLabel">Confirm Walk-in Request</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Please review the details before creating this request:</p>
+        <ul class="list-unstyled" id="confirmDetails" style="line-height: 1.8;"></ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-brand" id="confirmSubmitBtn">Create Request</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ------- Elements -------
+  const input           = document.getElementById('residentSearch');
+  const wrap            = document.getElementById('residentResults');
+  const spinner         = document.getElementById('residentSpinner');
+  const panel           = document.getElementById('residentSearchPanel');
+  const btnChange       = document.getElementById('changeResidentBtn');
+  const residentLabel   = document.getElementById('resident_label');
+  const personHidden    = document.getElementById('requested_by_person_id');
+  const form            = document.getElementById('walkinForm');
+  const formAlert       = document.getElementById('formAlert');
+
+  const docSel          = document.getElementById('reqDocType');
+  const purSel          = document.getElementById('purposeSelect');
+  const qtyInput        = document.getElementById('qtyInput');
+
+  const offenseWrap     = document.getElementById('offenseWrap');
+  const offenseInput    = document.getElementById('offenseInput');
+
+  const isOnBehalf      = document.getElementById('is_on_behalf');
+  const onBehalfRow     = document.getElementById('onBehalfRow');
+
+  // Business UI
+  const businessRow     = document.getElementById('businessRow');
+  const bizSel          = document.getElementById('businessSelect');
+  const bizHidden       = document.getElementById('business_id');
+
+  const submitBtn       = document.getElementById('submitBtn');
+  const btnLabel        = submitBtn.querySelector('.btn-label');
+  const btnSpinner      = submitBtn.querySelector('.btn-spinner');
+
+  // Summary fields
+  const sumRequester = document.getElementById('sumRequester');
+  const sumBehalf    = document.getElementById('sumBehalf');
+  const sumBiz       = document.getElementById('sumBiz');
+  const sumDoc       = document.getElementById('sumDoc');
+  const sumPurpose   = document.getElementById('sumPurpose');
+  const sumQty       = document.getElementById('sumQty');
+  const sumOffense   = document.getElementById('sumOffense');
+
+  // ------- Endpoints -------
+  const URL_SEARCH     = "{% url 'clerk:ajax_resident_search' %}";
+  const URL_PURPOSE    = "{% url 'clerk:ajax_purpose_options' %}";
+  const URL_BIZ_BY_OWN = "{% url 'clerk:ajax_owner_businesses' %}";
+
+  // ------- Helpers -------
+  let t = null;
+  const debounce = (fn, ms) => (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  const showSpinner = () => spinner.classList.remove('d-hidden');
+  const hideSpinner = () => spinner.classList.add('d-hidden');
+
+  const setAlert = (msg) => { formAlert.textContent = msg; formAlert.classList.remove('d-hidden'); };
+  const clearAlert = () => { formAlert.textContent = ''; formAlert.classList.add('d-hidden'); };
+
+  const startBtnLoading = () => { submitBtn.disabled = true; btnLabel.classList.add('d-hidden'); btnSpinner.classList.remove('d-hidden'); };
+  const stopBtnLoading  = () => { submitBtn.disabled = false; btnSpinner.classList.add('d-hidden'); btnLabel.classList.remove('d-hidden'); };
+
+  const isBusinessDoc   = (text) => (text||'').toLowerCase().includes('business');
+  const isClearanceDoc  = (text) => (text||'').toLowerCase().includes('clearance');
+
+  // NEW: detect "Certified True Copy" doc type
+  const isCTCDoc        = (text) => {
+    const s = (text||'').toLowerCase();
+    return s.includes('certified') && s.includes('true') && s.includes('copy');
+  };
+
+  // ------- PURPOSE INDEX (by document_purpose_id) -------
+  // We will match: business.business_category_id == document_purpose_id
+  let PURPOSE_INDEX = [];
+
+  function indexPurposes() {
+    PURPOSE_INDEX = [];
+    for (let i = 0; i < purSel.options.length; i++) {
+      const o = purSel.options[i];
+      if (!o.value) continue; // skip placeholder
+      const pidInt = /^\d+$/.test(o.value) ? parseInt(o.value, 10) : null; // document_purpose_id
+      PURPOSE_INDEX.push({
+        idx: i,
+        value: o.value,
+        purposeIdInt: pidInt,
+        text: o.text
+      });
+    }
+    console.log('[BBC] PURPOSE_INDEX (by document_purpose_id) built:');
+    console.table(PURPOSE_INDEX);
+  }
+
+  const updateSummary = () => {
+    sumRequester.textContent = residentLabel.textContent.trim() || '—';
+    sumDoc.textContent       = docSel.options[docSel.selectedIndex]?.text || '—';
+    sumPurpose.textContent   = purSel.options[purSel.selectedIndex]?.text || '—';
+    sumQty.textContent       = qtyInput.value || '1';
+    if (sumOffense) sumOffense.textContent = offenseInput.value || 'auto';
+
+    sumBehalf.textContent = (isOnBehalf.checked && onBehalfHidden?.value) ? onBehalfLabel.textContent : (isOnBehalf.checked ? '—' : 'n/a');
+
+    const opt = bizSel.options[bizSel.selectedIndex];
+    sumBiz.textContent = (!businessRow.classList.contains('d-hidden') && opt && opt.value) ? (opt.text || `ID ${opt.value}`) : (businessRow.classList.contains('d-hidden') ? 'n/a' : '—');
+  };
+
+  // ------- Resident search -------
+  async function doSearch(q) {
+    if (!q || q.trim().length < 2) {
+      wrap.innerHTML = '<div class="help">Type at least 2 characters…</div>';
+      hideSpinner(); return;
+    }
+    showSpinner();
+    try{
+      const resp = await fetch(`${URL_SEARCH}?q=${encodeURIComponent(q)}`, { headers: { "X-Requested-With":"fetch" } });
+      const html = await resp.text();
+      wrap.innerHTML = html || '<div class="help">No results.</div>';
+    }catch{
+      wrap.innerHTML = '<div class="text-danger small">Search failed. Please try again.</div>';
+    }finally{
+      hideSpinner();
+    }
+  }
+  if (input) input.addEventListener('input', debounce(e => doSearch(e.target.value), 250));
+
+  // pick resident (delegate)
+  wrap.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.pick-resident');
+    if (!btn) return;
+    const id  = btn.getAttribute('data-person-id');
+    const txt = btn.getAttribute('data-display');
+
+    document.getElementById('requested_by_person_id').value = id || '';
+    residentLabel.textContent = (txt && txt.trim()) ? txt : `ID ${id}`;
+    sumRequester.textContent  = residentLabel.textContent;
+
+    // close panel
+    input.value = '';
+    wrap.innerHTML = '<div class="help">Selected. Use “Change” to pick someone else.</div>';
+    panel.classList.add('d-none');
+    document.getElementById('changeResidentBtn').classList.remove('d-hidden');
+
+    // If current doc requires business (Business Clearance OR CTC), fetch businesses
+    const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+    const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
+    if (needsBusiness){
+      businessRow.classList.remove('d-hidden');
+      if (id) loadOwnerBusinesses(id, /* requireHasClearance */ isCTCDoc(selectedText));
+    }
+
+    clearAlert();
+  });
+
+  // change resident
+  btnChange.addEventListener('click', () => {
+    panel.classList.remove('d-none');
+    input.focus();
+    btnChange.classList.add('d-hidden');
+  });
+
+  // ------- Purpose auto-load -------
+  async function loadPurposes(docTypeId){
+    purSel.innerHTML = '<option value="">Loading…</option>';
+    purSel.disabled = true;
+    if (!docTypeId){
+      purSel.innerHTML = '<option value="">— select document first —</option>';
+      updateSummary(); return;
+    }
+    try{
+      const resp = await fetch(`${URL_PURPOSE}?request_document_type_id=${encodeURIComponent(docTypeId)}`, { headers: { "X-Requested-With":"fetch" } });
+      const html = await resp.text();
+      purSel.innerHTML = html || '<option value="">No purposes found</option>';
+      purSel.disabled = false;
+      indexPurposes(); // rebuild index after loading
+    }catch(e){
+      console.error('[BBC] loadPurposes failed:', e);
+      purSel.innerHTML = '<option value="">Failed to load purposes</option>';
+    }finally{
+      updateSummary();
+      if (!businessRow.classList.contains('d-hidden') && bizSel.value){
+        autoPickPurposeByCategory(); // attempt auto-pick if business already chosen
+      }
+    }
+  }
+
+  // ------- Load owner businesses (optionally require clearance) -------
+  async function loadOwnerBusinesses(ownerId, requireHasClearance=false){
+    bizSel.innerHTML = '<option value="">Loading…</option>';
+    try{
+      const url = new URL(URL_BIZ_BY_OWN, window.location.origin);
+      url.searchParams.set('owner_person_id', ownerId);
+      if (requireHasClearance) url.searchParams.set('require_has_clearance', '1');
+
+      const resp = await fetch(url.toString(), { headers: { "X-Requested-With":"fetch" }});
+      const html = await resp.text();
+      bizSel.innerHTML = html || '<option value="">— no businesses found —</option>';
+
+      // Debug: dump loaded businesses
+      const bizDump = [];
+      for (let i=0; i<bizSel.options.length; i++){
+        const o = bizSel.options[i];
+        if (!o.value) continue;
+        bizDump.push({ idx:i, id:o.value, text:o.text, business_category_id:o.getAttribute('data-bcat') });
+      }
+      console.log('[BBC/CTC] Loaded businesses for owner:', ownerId);
+      console.table(bizDump);
+    }catch(e){
+      console.error('[BBC/CTC] loadOwnerBusinesses failed:', e);
+      bizSel.innerHTML = '<option value="">Failed to load businesses</option>';
+    }finally{
+      bizHidden.value = '';
+      sumBiz.textContent = '—';
+    }
+  }
+
+  // ------- Auto-pick Purpose by equality: business_category_id == document_purpose_id -------
+  function autoPickPurposeByCategory(){
+    const opt = bizSel.options[bizSel.selectedIndex];
+    if (!opt || !opt.value) {
+      console.log('[BBC] No business selected; skip auto-pick.');
+      return;
+    }
+
+    // The <option> for a business must have data-bcat="{{ b.business_category_id }}"
+    const rawBcat = (opt.getAttribute('data-bcat') || '').trim();
+    const bcatInt = /^\d+$/.test(rawBcat) ? parseInt(rawBcat, 10) : null;
+
+    console.log('[BBC] Selected business for matching:', {
+      business_id: opt.value, name: opt.text, business_category_id_raw: rawBcat, business_category_id: bcatInt
+    });
+
+    if (bcatInt === null) {
+      console.warn('[BBC] business_category_id is not numeric; cannot match to document_purpose_id.');
+      return;
+    }
+
+    // Match: business_category_id == document_purpose_id
+    const match = PURPOSE_INDEX.find(p => p.purposeIdInt === bcatInt);
+
+    if (match){
+      purSel.selectedIndex = match.idx;
+      console.log('[BBC] Purpose auto-picked (doc_purpose_id == business_category_id):', match);
+    } else {
+      console.warn('[BBC] No Purpose where document_purpose_id == business_category_id:', bcatInt);
+    }
+
+    sumPurpose.textContent = purSel.options[purSel.selectedIndex]?.text || '—';
+  }
+
+  // ------- Toggle UI that depends on doc type -------
+  function updateDocDependentToggles(){
+    const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+
+    // Offense input visible only for "*clearance*"
+    offenseWrap.classList.toggle('d-hidden', !isClearanceDoc(selectedText));
+
+    // Business row shown for Business Clearance OR CTC
+    const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
+    businessRow.classList.toggle('d-hidden', !needsBusiness);
+
+    // If becoming visible and a resident is already chosen, fetch businesses
+    const ownerId = document.getElementById('requested_by_person_id').value;
+    if (needsBusiness && ownerId){
+      // If CTC → require only businesses with clearance
+      loadOwnerBusinesses(ownerId, /* requireHasClearance */ isCTCDoc(selectedText));
+    }else if(!needsBusiness){
+      bizSel.innerHTML = '<option value="">— select resident first —</option>';
+      bizHidden.value = '';
+      sumBiz.textContent = '—';
+    }
+
+    // Help text tweak (optional)
+    const help = businessRow.querySelector('.help');
+    if (help){
+      help.textContent = isCTCDoc(selectedText)
+        ? 'This list shows only the resident’s businesses that already have a business clearance.'
+        : 'This list shows businesses owned by the selected resident.';
+    }
+
+    updateSummary();
+  }
+
+  // listeners
+  if (docSel){
+    docSel.addEventListener('change', e => { loadPurposes(e.target.value); updateDocDependentToggles(); clearAlert(); });
+  }
+  purSel.addEventListener('change', updateSummary);
+  qtyInput.addEventListener('input', updateSummary);
+  offenseInput.addEventListener('input', updateSummary);
+
+  // on-behalf search elements
+  const onBehalfSearch = document.getElementById('onBehalfSearch');
+  const onBehalfResults = document.getElementById('onBehalfResults');
+  const onBehalfSpinner = document.getElementById('onBehalfSpinner');
+  const onBehalfSelected = document.getElementById('onBehalfSelected');
+  const onBehalfLabel = document.getElementById('onBehalfLabel');
+  const onBehalfHidden = document.getElementById('on_behalf_of_person_id');
+  const clearOnBehalfBtn = document.getElementById('clearOnBehalf');
+
+  // on-behalf toggling
+  isOnBehalf.addEventListener('change', () => {
+    onBehalfRow.classList.toggle('d-hidden', !isOnBehalf.checked);
+    if (!isOnBehalf.checked){
+      if (onBehalfHidden) onBehalfHidden.value = '';
+      onBehalfSelected.classList.add('d-hidden');
+      onBehalfSearch.value = '';
+      onBehalfResults.innerHTML = '<div class="help">Type to search…</div>';
+    }
+    updateSummary();
+  });
+
+  // on-behalf search (debounced)
+  async function doOnBehalfSearch(q) {
+    if (!q || q.trim().length < 2) {
+      onBehalfResults.innerHTML = '<div class="help">Type at least 2 characters…</div>';
+      onBehalfSpinner.classList.add('d-hidden');
+      return;
+    }
+    onBehalfSpinner.classList.remove('d-hidden');
+    try {
+      const resp = await fetch(`${URL_SEARCH}?q=${encodeURIComponent(q)}`, { headers: { "X-Requested-With":"fetch" } });
+      const html = await resp.text();
+      onBehalfResults.innerHTML = html || '<div class="help">No results.</div>';
+    } catch {
+      onBehalfResults.innerHTML = '<div class="text-danger small">Search failed.</div>';
+    } finally {
+      onBehalfSpinner.classList.add('d-hidden');
+    }
+  }
+  if (onBehalfSearch) onBehalfSearch.addEventListener('input', debounce(e => doOnBehalfSearch(e.target.value), 250));
+
+  // pick on-behalf person
+  onBehalfResults.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.pick-resident');
+    if (!btn) return;
+    const id = btn.getAttribute('data-person-id');
+    const txt = btn.getAttribute('data-display');
+    onBehalfHidden.value = id || '';
+    onBehalfLabel.textContent = (txt && txt.trim()) ? txt : `ID ${id}`;
+    onBehalfSelected.classList.remove('d-hidden');
+    onBehalfSearch.value = '';
+    onBehalfResults.innerHTML = '<div class="help">Selected.</div>';
+    updateSummary();
+  });
+
+  // clear on-behalf
+  if (clearOnBehalfBtn) {
+    clearOnBehalfBtn.addEventListener('click', () => {
+      onBehalfHidden.value = '';
+      onBehalfSelected.classList.add('d-hidden');
+      onBehalfSearch.value = '';
+      onBehalfResults.innerHTML = '<div class="help">Type to search…</div>';
+      updateSummary();
+    });
+  }
+
+  onBehalfRow.addEventListener('input', updateSummary);
+
+  // business change → set hidden + summary + auto-pick purpose
+  bizSel.addEventListener('change', () => {
+    const opt = bizSel.options[bizSel.selectedIndex];
+    const val = opt?.value || '';
+    bizHidden.value = val;
+    sumBiz.textContent = opt?.text || '—';
+    autoPickPurposeByCategory();
+  });
+
+  // Modal confirm button handler
+  document.getElementById('confirmSubmitBtn').addEventListener('click', () => {
+    console.log('[WALKIN] User confirmed, submitting form');
+    const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+    modal.hide();
+    startBtnLoading();
+    
+    // Use fetch to submit form and handle errors
+    const formData = new FormData(form);
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        return response.text().then(text => {
+          throw new Error(text || 'Request failed');
+        });
+      }
+      // Check if response is a redirect
+      if (response.redirected) {
+        window.location.href = response.url;
+        return;
+      }
+      return response.text();
+    })
+    .then(data => {
+      if (data && typeof data === 'string' && data.includes('error')) {
+        stopBtnLoading();
+        setAlert('Request failed. Please try again.');
+        scrollToTop();
+      } else if (!window.location.href.includes('/detail/')) {
+        // If not redirected yet, do it manually
+        form.submit();
+      }
+    })
+    .catch(error => {
+      console.error('[WALKIN] Submit error:', error);
+      stopBtnLoading();
+      
+      let errorMsg = 'Unknown error';
+      if (error.message) {
+        errorMsg = error.message;
+        const match = errorMsg.match(/['"]message['"]\s*:\s*['"]([^'"]+)['"]/i);
+        if (match && match[1]) {
+          errorMsg = match[1];
+        }
+      }
+      
+      setAlert(errorMsg);
+      scrollToTop();
+    });
+  });
+  
+  // Helper to scroll to top
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // init
+  updateDocDependentToggles();
+  indexPurposes();   // build once if options already present
+  updateSummary();
+
+  // ------- Auto-select prefilled resident if provided -------
+  {% if prefill_resident %}
+  (function autoPrefillResident() {
+    const prefillId = '{{ prefill_resident.person_id }}';
+    const prefillFirstName = '{{ prefill_resident.first_name|default:""|escapejs }}';
+    const prefillLastName = '{{ prefill_resident.last_name|default:""|escapejs }}';
+    const prefillMiddleName = '{{ prefill_resident.middle_name|default:""|escapejs }}';
+    const prefillSuffix = '{{ prefill_resident.suffix|default:""|escapejs }}';
+    const prefillCode = '{{ prefill_resident.person_code|default:""|escapejs }}';
+    {% if prefill_data %}
+    const prefillBusinessId = '{{ prefill_data.business_id }}';
+    const prefillBusinessName = '{{ prefill_data.business_name|escapejs }}';
+    {% endif %}
+    
+    // Build full name
+    let fullName = '';
+    if (prefillLastName) fullName += prefillLastName.toUpperCase();
+    if (prefillFirstName) fullName += (fullName ? ', ' : '') + prefillFirstName;
+    if (prefillMiddleName) fullName += ' ' + prefillMiddleName.charAt(0).toUpperCase() + '.';
+    if (prefillSuffix) fullName += ' ' + prefillSuffix.toUpperCase();
+    
+    // Build display text (with code if resident, without if non-resident)
+    const displayText = prefillCode 
+      ? fullName + ' (' + prefillCode + ')'
+      : fullName + ' (Non-Resident Business Owner)';
+    
+    console.log('[WALKIN PREFILL] Auto-selecting owner:', prefillId, displayText);
+    
+    // Set the hidden input and label
+    personHidden.value = prefillId;
+    residentLabel.textContent = displayText;
+    
+    // Hide the search panel and show change button
+    panel.classList.add('d-none');
+    btnChange.classList.remove('d-hidden');
+    wrap.innerHTML = '<div class="help">Pre-filled from business owner. Use "Change" to pick someone else.</div>';
+    
+    // Update summary
+    updateSummary();
+    
+    {% if prefill_data %}
+    // Auto-select "Barangay Business Clearance" document type
+    setTimeout(async () => {
+      console.log('[WALKIN PREFILL] Looking for Barangay Business Clearance document type');
+      
+      // Find "BARANGAY BUSINESS CLEARANCE" in document types
+      let foundDocType = false;
+      for (let i = 0; i < docSel.options.length; i++) {
+        const optText = (docSel.options[i].text || '').toUpperCase();
+        if (optText.includes('BARANGAY') && optText.includes('BUSINESS') && optText.includes('CLEARANCE')) {
+          docSel.selectedIndex = i;
+          foundDocType = true;
+          console.log('[WALKIN PREFILL] Selected document type:', docSel.options[i].text);
+          break;
+        }
+      }
+      
+      if (foundDocType) {
+        // Trigger document type change to load purposes
+        const docTypeId = docSel.value;
+        await loadPurposes(docTypeId);
+        updateDocDependentToggles();
+        
+        // Load businesses for the owner
+        console.log('[WALKIN PREFILL] Loading businesses for owner:', prefillId);
+        await loadOwnerBusinesses(prefillId, false);
+        
+        // Wait a bit for businesses to load, then select the specific business
+        setTimeout(() => {
+          console.log('[WALKIN PREFILL] Attempting to select business:', prefillBusinessId);
+          
+          // Find and select the business
+          let foundBusiness = false;
+          for (let i = 0; i < bizSel.options.length; i++) {
+            if (bizSel.options[i].value === prefillBusinessId) {
+              bizSel.selectedIndex = i;
+              bizHidden.value = prefillBusinessId;
+              foundBusiness = true;
+              console.log('[WALKIN PREFILL] Selected business:', bizSel.options[i].text);
+              break;
+            }
+          }
+          
+          if (foundBusiness) {
+            // Auto-pick purpose based on business category
+            autoPickPurposeByCategory();
+          }
+          
+          // Update summary with all selections
+          updateSummary();
+        }, 300);
+      }
+    }, 100);
+    {% endif %}
+    
+    console.log('[WALKIN PREFILL] Owner auto-selected successfully');
+  })();
+  {% endif %}
+
+  // ------- Validation & submit -------
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    console.log('[WALKIN] Form submit triggered');
+    
+    clearAlert();
+    const errors = [];
+    
+    // Scroll to top to show alert if there are errors
+    const scrollToAlert = () => {
+      if (errors.length > 0) {
+        formAlert.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    if (!personHidden.value){ errors.push('Please select a resident (requester).'); }
+    if (!docSel.value){ errors.push('Please choose a document type.'); docSel.classList.add('is-invalid'); }
+    else{ docSel.classList.remove('is-invalid'); }
+
+    if (!purSel.value || purSel.disabled){ errors.push('Please choose a purpose.'); purSel.classList.add('is-invalid'); }
+    else{ purSel.classList.remove('is-invalid'); }
+
+    if (!qtyInput.value || Number(qtyInput.value) < 1){ errors.push('Quantity must be at least 1.'); qtyInput.classList.add('is-invalid'); }
+    else{ qtyInput.classList.remove('is-invalid'); }
+
+    // Check on-behalf selection
+    if (isOnBehalf.checked && !onBehalfHidden.value){
+      errors.push('Please select a person for on-behalf request.');
+    }
+    if (isOnBehalf.checked && !document.getElementById('authLetter').files.length){
+      errors.push('Please upload an authorization letter.');
+    }
+
+    // If requires business (Business Clearance or CTC), require a selected business
+    const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+    const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
+    if (needsBusiness && !bizHidden.value){
+      errors.push(isCTCDoc(selectedText)
+        ? 'Please choose a business that already has a clearance (for Certified True Copy).'
+        : 'Please choose a business for Barangay Business Clearance.');
+    }
+
+    if (errors.length){
+      console.log('[WALKIN] Validation errors:', errors);
+      setAlert(errors.join(' '));
+      scrollToAlert();
+      return;
+    }
+
+    // Build confirmation details
+    const requesterName = residentLabel.textContent.trim() || 'Unknown';
+    const docName = docSel.options[docSel.selectedIndex]?.text || 'Unknown';
+    const purposeName = purSel.options[purSel.selectedIndex]?.text || 'Unknown';
+    const qty = qtyInput.value || '1';
+    
+    let detailsHTML = `<li><strong>Requester:</strong> ${requesterName}</li>`;
+    detailsHTML += `<li><strong>Document:</strong> ${docName}</li>`;
+    detailsHTML += `<li><strong>Purpose:</strong> ${purposeName}</li>`;
+    detailsHTML += `<li><strong>Quantity:</strong> ${qty}</li>`;
+    
+    if (isOnBehalf.checked && onBehalfHidden?.value) {
+      detailsHTML += `<li><strong>On behalf of:</strong> ${onBehalfLabel.textContent}</li>`;
+    }
+    
+    if (needsBusiness && bizHidden.value) {
+      const bizName = bizSel.options[bizSel.selectedIndex]?.text || 'Unknown';
+      detailsHTML += `<li><strong>Business:</strong> ${bizName}</li>`;
+    }
+    
+    console.log('[WALKIN] Showing confirmation modal');
+    
+    // Populate modal and show
+    document.getElementById('confirmDetails').innerHTML = detailsHTML;
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
+  });
+})();
+</script>
+{% endblock %}

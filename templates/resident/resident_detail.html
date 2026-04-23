@@ -1,0 +1,674 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <style>
+    :root{
+      --brand:#6d2932;
+      --section-border:#e9ecef;
+      --section-bg:#fff;
+      --section-cap-bg:#f8f9fa;
+      --muted:#6c757d;
+    }
+
+    .btn-outline-brand{color:#6d2932; border-color:#6d2932; background:#fff;}
+    .btn-outline-brand:hover{background:#6d2932; color:#fff;}
+
+    .page-header{
+      background:linear-gradient(135deg, #6d2932 0%, #8a3843 100%);
+      border-radius:12px;
+      padding:2rem;
+      margin-bottom:2rem;
+      color:#fff;
+      box-shadow:0 4px 12px rgba(109,41,50,.15);
+    }
+
+    .resident-code{font-size:2.5rem; font-weight:800; margin-bottom:.5rem;}
+    .resident-name{font-size:1.5rem; font-weight:300; opacity:.95;}
+
+    .profile-avatar{
+      width:120px;
+      height:120px;
+      border-radius:50%;
+      border:4px solid rgba(255,255,255,.3);
+      object-fit:cover;
+      background:#fff;
+    }
+
+    .profile-initial{
+      width:120px;
+      height:120px;
+      border-radius:50%;
+      border:4px solid rgba(255,255,255,.3);
+      background:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:3rem;
+      font-weight:700;
+      color:#6d2932;
+    }
+
+    .section-block{
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      border-left:4px solid var(--brand);
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
+      box-shadow:0 1px 3px rgba(16,24,40,.08);
+    }
+
+    .section-header{
+      display:flex;
+      align-items:center;
+      gap:.75rem;
+      margin-bottom:1.25rem;
+      padding-bottom:1rem;
+      border-bottom:2px solid #f1f3f5;
+    }
+
+    .section-icon{
+      width:40px;
+      height:40px;
+      border-radius:10px;
+      background:linear-gradient(135deg, #6d2932 0%, #8a3843 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:1.25rem;
+    }
+
+    .section-title{font-weight:700; font-size:1.25rem; margin:0; color:#1a1a1a;}
+
+    .info-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));
+      gap:1.25rem;
+    }
+
+    .info-item{display:flex; flex-direction:column; gap:.25rem;}
+    .info-label{font-size:.8125rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
+    .info-value{font-size:1rem; font-weight:600; color:#1a1a1a;}
+
+    .badge-custom{
+      display:inline-flex;
+      align-items:center;
+      gap:.375rem;
+      padding:.375rem .75rem;
+      border-radius:999px;
+      font-size:.8125rem;
+      font-weight:600;
+    }
+
+    .badge-verified{background:#e8f7ef; color:#0f5132; border:1px solid #cce7da;}
+    .badge-unverified{background:#fff3cd; color:#856404; border:1px solid #ffeaa7;}
+    .badge-staff{background:#cfe2ff; color:#084298; border:1px solid #b6d4fe;}
+    .badge-student{background:#e7f1ff; color:#004085; border:1px solid #bee5eb;}
+    .badge-business{background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;}
+    .badge-yes{background:#d1e7dd; color:#0f5132; border:1px solid #badbcc;}
+    .badge-no{background:#f8d7da; color:#842029; border:1px solid #f5c2c7;}
+
+    .doc-preview{
+      position:relative;
+      border-radius:8px;
+      overflow:hidden;
+      aspect-ratio:16/10;
+      background:#f8f9fa;
+      border:2px solid #e9ecef;
+    }
+
+    .doc-preview img{width:100%; height:100%; object-fit:cover;}
+
+    .family-member-pill{
+      display:inline-block;
+      background:#f3eaeb;
+      border:1px solid rgba(109,41,50,.18);
+      padding:.375rem .75rem;
+      border-radius:999px;
+      font-size:.875rem;
+      margin:.25rem;
+      font-weight:500;
+    }
+
+    .back-link{
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+      color:#6d2932;
+      text-decoration:none;
+      font-weight:600;
+      margin-bottom:1.5rem;
+      transition:all .2s ease;
+    }
+
+    .back-link:hover{gap:.75rem; color:#8a3843;}
+
+    .gov-program-tag{
+      background:#fff;
+      border:1px solid #dee2e6;
+      padding:.5rem 1rem;
+      border-radius:8px;
+      font-size:.875rem;
+      margin:.25rem;
+      display:inline-block;
+    }
+
+    .btn-confirm-residency{
+      background:#fff;
+      color:#6d2932;
+      border:2px solid #fff;
+      padding:.625rem 1.5rem;
+      border-radius:8px;
+      font-weight:600;
+      font-size:.9375rem;
+      transition:all .2s ease;
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+      margin:.25rem;
+      white-space:nowrap;
+    }
+
+    .btn-confirm-residency:hover{
+      background:rgba(255,255,255,.9);
+      transform:translateY(-2px);
+      box-shadow:0 4px 12px rgba(0,0,0,.15);
+    }
+
+    .badges-and-actions{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:.25rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top:60px;">
+
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="row align-items-center">
+      <div class="col-auto">
+        {% if resident.profile_picture %}
+          <img src="{{ resident.profile_picture }}" class="profile-avatar" alt="Profile">
+        {% else %}
+          <div class="profile-initial">
+            {{ resident.first_name|first|upper }}
+          </div>
+        {% endif %}
+      </div>
+      <div class="col">
+        <div class="resident-code">{{ resident.person_code }}</div>
+        <input type="hidden" id="residentId" name="residentId" value="{{ resident.person_id }}">
+        <div class="resident-name">
+          {{ resident.first_name }} 
+          {% if resident.middle_name %}{{ resident.middle_name|slice:":1" }}.{% endif %} 
+          {{ resident.last_name }}
+          {% if resident.suffix %} {{ resident.suffix }}{% endif %}
+        </div>
+        <div class="mt-2 badges-and-actions">
+          {% if resident.is_email_verified %}
+            <span class="badge-custom badge-verified">{% bs_icon 'check-circle' %} Email Verified</span>
+          {% else %}
+            <span class="badge-custom badge-unverified">{% bs_icon 'exclamation-circle' %} Email Not Verified</span>
+          {% endif %}
+          
+          {% if resident.is_staff %}
+            <span class="badge-custom badge-staff">{% bs_icon 'shield-check' %} Staff - {{ resident.role_name }}</span>
+          {% endif %}
+          
+          {% if resident.is_student %}
+            <span class="badge-custom badge-student">{% bs_icon 'book' %} Student</span>
+          {% endif %}
+          
+          {% if resident.is_business_owner %}
+            <span class="badge-custom badge-business">{% bs_icon 'briefcase' %} Business Owner</span>
+          {% endif %}
+          
+          {% if resident.residential_status|lower != 'resident'%}
+          <button type="button" class="btn-confirm-residency" id="confirmResidencyBtn">
+            {% bs_icon 'check-circle' %}
+            Confirm Residency
+          </button>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personal Information -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'person-fill' %}</div>
+      <h2 class="section-title">Personal Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Birthdate</div>
+        <div class="info-value">{{ resident.birthdate|date:"F d, Y"|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Age</div>
+        <div class="info-value">{{ resident.age|floatformat:"0"|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Sex</div>
+        <div class="info-value">{{ resident.sex|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Civil Status</div>
+        <div class="info-value">{{ resident.civil_status|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Religion</div>
+        <div class="info-value">{{ resident.religion|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Nationality</div>
+        <div class="info-value">{{ resident.nationality|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact Information -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'telephone-fill' %}</div>
+      <h2 class="section-title">Contact Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Email</div>
+        <div class="info-value">{{ resident.email|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Mobile Number</div>
+        <div class="info-value">{{ resident.mobile_num|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item" style="grid-column:1/-1;">
+        <div class="info-label">Address</div>
+        <div class="info-value">
+          {% if resident.street_name or resident.purok_sitio_name or resident.barangay_name or resident.city_name %}
+            {{ resident.street_name }}{% if resident.purok_sitio_name %}, {{ resident.purok_sitio_name }}{% endif %}{% if resident.barangay_name %}, {{ resident.barangay_name }}{% endif %}{% if resident.city_name %}, {{ resident.city_name }}{% endif %}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Employment & Education -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'briefcase-fill' %}</div>
+      <h2 class="section-title">Employment & Education</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Education Level</div>
+        <div class="info-value">{{ resident.education|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Employment Status</div>
+        <div class="info-value">{{ resident.employment_status|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Occupation</div>
+        <div class="info-value">{{ resident.occupation|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Personal Monthly Income</div>
+        <div class="info-value">{{ resident.personal_monthly_income|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Residential Status -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'house-door-fill' %}</div>
+      <h2 class="section-title">Residential Status</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Status</div>
+        <div class="info-value">{{ resident.residential_status|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Residency Period</div>
+        <div class="info-value">{{ resident.residency_period|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Resident Since</div>
+        <div class="info-value">{{ resident.resident_since|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Registration Method</div>
+        <div class="info-value">{{ resident.registration_method|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Government Programs -->
+  {% if resident.government_programs %}
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'award-fill' %}</div>
+      <h2 class="section-title">Government Programs</h2>
+    </div>
+    
+    <div>
+      {% for program in resident.government_programs %}
+        <span class="gov-program-tag">{{ program }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Household Information -->
+  {% if resident.household_num %}
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'house-fill' %}</div>
+      <h2 class="section-title">Household Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Household Number</div>
+        <div class="info-value">{{ resident.household_num }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Household Head</div>
+        <div class="info-value">
+          {{ resident.household_head_first_name }} 
+          {% if resident.household_head_middle_name %}{{ resident.household_head_middle_name|slice:":1" }}.{% endif %}
+          {{ resident.household_head_last_name }}
+          {% if resident.household_head_suffix %} {{ resident.household_head_suffix }}{% endif %}
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">House Type</div>
+        <div class="info-value">{{ resident.house_type|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">House Ownership</div>
+        <div class="info-value">{{ resident.house_ownership|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Family Information -->
+  {% if resident.family_num %}
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'people-fill' %}</div>
+      <h2 class="section-title">Family Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Family Number</div>
+        <div class="info-value">{{ resident.family_num }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Family Head</div>
+        <div class="info-value">
+          {{ resident.family_head_first_name }} 
+          {% if resident.family_head_middle_name %}{{ resident.family_head_middle_name|slice:":1" }}.{% endif %}
+          {{ resident.family_head_last_name }}
+          {% if resident.family_head_suffix %} {{ resident.family_head_suffix }}{% endif %}
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Household Type</div>
+        <div class="info-value">{{ resident.household_type|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">NHTS Status</div>
+        <div class="info-value">{{ resident.nhts_status|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Indigent Status</div>
+        <div class="info-value">{{ resident.indigent_status|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Family Monthly Income</div>
+        <div class="info-value">{{ resident.family_monthly_income|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item" style="grid-column:1/-1;">
+        <div class="info-label">Source of Income</div>
+        <div class="info-value">{{ resident.source_of_income|default:"—" }}</div>
+      </div>
+      
+      {% if resident.other_family_members %}
+      <div class="info-item" style="grid-column:1/-1;">
+        <div class="info-label">Other Family Members</div>
+        <div class="mt-2">
+          {% for member in resident.other_family_members %}
+            <span class="family-member-pill">{{ member }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Family Relations -->
+  {% if resident.mother_name or resident.father_name or resident.guardian_name or resident.children_names %}
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'diagram-3-fill' %}</div>
+      <h2 class="section-title">Family Relations</h2>
+    </div>
+    
+    <div class="info-grid">
+      {% if resident.mother_name %}
+      <div class="info-item">
+        <div class="info-label">Mother</div>
+        <div class="info-value">{{ resident.mother_name }}</div>
+      </div>
+      {% endif %}
+      
+      {% if resident.father_name %}
+      <div class="info-item">
+        <div class="info-label">Father</div>
+        <div class="info-value">{{ resident.father_name }}</div>
+      </div>
+      {% endif %}
+      
+      {% if resident.guardian_name %}
+      <div class="info-item">
+        <div class="info-label">Guardian</div>
+        <div class="info-value">{{ resident.guardian_name }}</div>
+      </div>
+      {% endif %}
+      
+      {% if resident.children_names %}
+      <div class="info-item" style="grid-column:1/-1;">
+        <div class="info-label">Children</div>
+        <div class="mt-2">
+          {% for child in resident.children_names %}
+            <span class="family-member-pill">{{ child }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Documents -->
+  {% if resident.valid_id_front_path or resident.valid_id_back_path or resident.selfie_with_id %}
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">{% bs_icon 'file-earmark-text-fill' %}</div>
+      <h2 class="section-title">Documents</h2>
+    </div>
+    
+    {% if resident.id_type_name %}
+    <div class="mb-3">
+      <span class="info-label">ID Type:</span> 
+      <span class="info-value">{{ resident.id_type_name }}</span>
+    </div>
+    {% endif %}
+    
+    <div class="row g-3">
+      {% if resident.valid_id_front_path %}
+      <div class="col-md-4">
+        <div class="info-label mb-2">Valid ID (Front)</div>
+        <div class="doc-preview">
+          <img src="{{ resident.valid_id_front_path }}" alt="Valid ID Front">
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if resident.valid_id_back_path %}
+      <div class="col-md-4">
+        <div class="info-label mb-2">Valid ID (Back)</div>
+        <div class="doc-preview">
+          <img src="{{ resident.valid_id_back_path }}" alt="Valid ID Back">
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if resident.selfie_with_id %}
+      <div class="col-md-4">
+        <div class="info-label mb-2">Selfie with ID</div>
+        <div class="doc-preview">
+          <img src="{{ resident.selfie_with_id }}" alt="Selfie with ID">
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Confirm Residency Modal -->
+<div class="modal fade" id="confirmResidencyModal" tabindex="-1" aria-labelledby="confirmResidencyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmResidencyModalLabel">Confirm Residency</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="confirmResidencyForm">
+          <div class="mb-3">
+            <label for="residencyReason" class="form-label">Reason <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="residencyReason" rows="4" placeholder="Enter reason for confirming residency..." required></textarea>
+          </div>
+          
+          <div class="mb-3">
+            <label for="householdRelationship" class="form-label">Relationship to Household Head <span class="text-danger">*</span></label>
+            <select class="form-select" id="householdRelationship" required>
+              <option value="" selected disabled>Select relationship...</option>
+              <option value="1">HOUSEHOLD HEAD</option>
+              <option value="2">FAMILY HEAD</option>
+              <option value="3">SPOUSE</option>
+              <option value="4">MOTHER</option>
+              <option value="5">FATHER</option>
+              <option value="6">GUARDIAN</option>
+              <option value="7">CHILD</option>
+              <option value="8">SON</option>
+              <option value="9">DAUGHTER</option>
+              <option value="10">SIBLING</option>
+              <option value="11">GRANDCHILD</option>
+              <option value="12">GRANDPARENT</option>
+              <option value="13">NEPHEW</option>
+              <option value="14">NIECE</option>
+              <option value="15">UNCLE</option>
+              <option value="16">AUNT</option>
+              <option value="17">COUSIN</option>
+              <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+              <option value="19">BOARDER</option>
+              <option value="20">RENTER</option>
+              <option value="21">DOMESTIC HELPER</option>
+              <option value="22">OTHER RELATIVE</option>
+              <option value="23">NON-RELATIVE</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label for="familyRelationship" class="form-label">Relationship to Family Head <span class="text-danger">*</span></label>
+            <select class="form-select" id="familyRelationship" required>
+              <option value="" selected disabled>Select relationship...</option>
+              <option value="1">HOUSEHOLD HEAD</option>
+              <option value="2">FAMILY HEAD</option>
+              <option value="3">SPOUSE</option>
+              <option value="4">MOTHER</option>
+              <option value="5">FATHER</option>
+              <option value="6">GUARDIAN</option>
+              <option value="7">CHILD</option>
+              <option value="8">SON</option>
+              <option value="9">DAUGHTER</option>
+              <option value="10">SIBLING</option>
+              <option value="11">GRANDCHILD</option>
+              <option value="12">GRANDPARENT</option>
+              <option value="13">NEPHEW</option>
+              <option value="14">NIECE</option>
+              <option value="15">UNCLE</option>
+              <option value="16">AUNT</option>
+              <option value="17">COUSIN</option>
+              <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+              <option value="19">BOARDER</option>
+              <option value="20">RENTER</option>
+              <option value="21">DOMESTIC HELPER</option>
+              <option value="22">OTHER RELATIVE</option>
+              <option value="23">NON-RELATIVE</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveConfirmResidency">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block js %}
+  <script src="{% static 'js/resident_detail.js' %}"></script>
+{% endblock %}
+
+{% endblock %}
+

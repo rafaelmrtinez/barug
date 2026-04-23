@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+<style>
+.chip{display:inline-flex;align-items:center;padding:8px 12px;background:#7a1212;color:#fff;border-radius:16px;margin:4px;cursor:pointer}
+.chip:hover{background:#5a0e0e}
+.search-results{max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;margin-top:8px}
+.search-item{padding:12px;border-bottom:1px solid #eee;cursor:pointer}
+.search-item:hover{background:#f5f5f5}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+    <div class="step-progress mb-2">
+        <div class="step completed"><div class="circle">1</div><div class="label">Personal Info</div></div>
+        <div class="step active"><div class="circle">2</div><div class="label">Link Parent/Guardian</div></div>
+        <div class="step"><div class="circle">3</div><div class="label">Link Children</div></div>
+        <div class="step"><div class="circle">4</div><div class="label">Socioeconomic</div></div>
+    </div>
+
+    <form method="post" class="d-flex flex-column flex-grow-1">
+        {% csrf_token %}
+        <h5>Link Parent(s) / Guardian</h5>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>Linked Parent(s)/Guardian</h6>
+                <div id="linked-chips">
+                    {% if mother_name %}<span class="chip" data-rel="mother">{{ mother_name }} • MOTHER <button type="button" onclick="unlink('mother')" style="border:none;background:none;color:#fff;margin-left:8px">×</button></span>{% endif %}
+                    {% if father_name %}<span class="chip" data-rel="father">{{ father_name }} • FATHER <button type="button" onclick="unlink('father')" style="border:none;background:none;color:#fff;margin-left:8px">×</button></span>{% endif %}
+                    {% if guardian_name %}<span class="chip" data-rel="guardian">{{ guardian_name }} • GUARDIAN <button type="button" onclick="unlink('guardian')" style="border:none;background:none;color:#fff;margin-left:8px">×</button></span>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>Search & Link</h6>
+                <div class="row">
+                    <div class="col-md-4"><div class="form-floating mb-3"><select class="form-select" id="rel-select"><option value="">Select Relationship</option><option value="mother" {% if mother_name %}disabled{% endif %}>Mother</option><option value="father" {% if father_name %}disabled{% endif %}>Father</option><option value="guardian" {% if guardian_name %}disabled{% endif %}>Guardian</option></select><label>Relationship</label></div></div>
+                    <div class="col-md-8"><div class="form-floating mb-3"><input type="text" class="form-control" id="search-input" placeholder="Search resident"><label>Search Resident</label></div><div id="search-results" class="search-results" style="display:none"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" name="mother_id" id="mother_id" value="{{ mother_id }}">
+        <input type="hidden" name="father_id" id="father_id" value="{{ father_id }}">
+        <input type="hidden" name="guardian_id" id="guardian_id" value="{{ guardian_id }}">
+        <input type="hidden" name="mother_name" id="mother_name" value="">
+        <input type="hidden" name="father_name" id="father_name" value="">
+        <input type="hidden" name="guardian_name" id="guardian_name" value="">
+
+        <div class="mt-auto button-container">
+            <a href="{% url 'bhw:profile_personal_info' %}" class="btn btn-reset">Back</a>
+            <button type="submit" class="btn btn-submit">Continue</button>
+        </div>
+    </form>
+</div>
+
+<script>
+let searchTimeout;
+document.getElementById('search-input').addEventListener('input', function(e) {
+    clearTimeout(searchTimeout);
+    const q = e.target.value.trim();
+    if (q.length < 2) { document.getElementById('search-results').style.display = 'none'; return; }
+    searchTimeout = setTimeout(() => {
+        fetch(`/bhw/ajax/resident-search/?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+                const div = document.getElementById('search-results');
+                div.innerHTML = data.html;
+                div.style.display = 'block';
+                attachPickHandlers();
+            });
+    }, 300);
+});
+
+function attachPickHandlers() {
+    document.querySelectorAll('.pick-resident').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.personId;
+            const name = this.dataset.personName;
+            selectResident(id, name);
+        });
+    });
+}
+
+function selectResident(id, name) {
+    const rel = document.getElementById('rel-select').value;
+    if (!rel) { alert('Select relationship first'); return; }
+    document.getElementById(rel + '_id').value = id;
+    document.getElementById(rel + '_name').value = name;
+    const chip = `<span class="chip" data-rel="${rel}">${name} • ${rel.toUpperCase()} <button type="button" onclick="unlink('${rel}')" style="border:none;background:none;color:#fff;margin-left:8px">×</button></span>`;
+    document.getElementById('linked-chips').insertAdjacentHTML('beforeend', chip);
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-results').style.display = 'none';
+    document.querySelector(`#rel-select option[value="${rel}"]`).disabled = true;
+}
+
+function unlink(rel) {
+    document.getElementById(rel + '_id').value = '';
+    document.getElementById(rel + '_name').value = '';
+    document.querySelector(`.chip[data-rel="${rel}"]`).remove();
+    document.querySelector(`#rel-select option[value="${rel}"]`).disabled = false;
+}
+</script>
+{% endblock %}

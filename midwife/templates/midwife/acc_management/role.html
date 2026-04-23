@@ -1,0 +1,349 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <link rel="stylesheet" href="{% static 'css/form.css' %}">
+  <!-- for .section-title, .kv, .doc-carousel, etc. -->
+  <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 w-100 bg-white text-dark" style="margin-top:40px;">
+  <div class="sticky-top border-bottom bg-white">
+    <div class="container px-3 py-3">
+      <h3 class="fw-semibold">Account Management — Staff Accounts</h3>
+      <p class="mt-1 small text-muted">
+        Link a non-resident as a staff member by manually recording their information in the barangay system.
+      </p>
+    </div>
+  </div>
+
+  <div class="container px-3 py-4">
+    <section class="rounded-3 border bg-white p-4 shadow-sm">
+
+      <form method="post" action="{% url 'midwife:staff_selection_non-resident_role_review' %}">
+        {% csrf_token %}
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <h2 class="fs-5 fw-semibold mb-0">Non-Resident Staff Linking</h2>
+        </div>
+
+        <!-- Selected Person Summary -->
+        <div class="mt-4">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h5 class="card-title mb-1">
+                    {{ personal.last_name|default:""|title }}, {{ personal.first_name|default:""|title }}
+                    {% with m=personal.middle_name|default_if_none:'' %}{% if m %} {{ m|slice:":1"|upper }}.{% endif %}{% endwith %}
+                    {{ personal.suffix|default:""|upper }}
+                  </h5>
+                </div>
+              </div>
+
+              <hr class="my-3">
+
+              <div class="row g-4 align-items-start">
+                <!-- Personal Information -->
+                <div class="col-12 col-md-6">
+                  <div class="section-title mb-2">Personal Information</div>
+                  <div class="kv kv-wrap">
+                    <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ personal.last_name|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ personal.first_name|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ personal.middle_name|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ personal.suffix|default:""|upper }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ personal.sex_label|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Date of Birth</span>
+                      <span class="kv-val">
+                        {% if personal.birthdate_display %}
+                          {{ personal.birthdate_display }}
+                        {% elif personal.birthdate %}
+                          {{ personal.birthdate }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </span>
+                    </div>
+                    <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ personal.civil_status_label|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ personal.nationality_label|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ personal.religion_label|default:""|title }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Home Address</span>
+                      <span class="kv-val">
+                        {{ personal.street|default:""|title }},
+                        {{ personal.sitio_purok|default:""|title }},
+                        {{ personal.barangay|default:""|title }},
+                        {{ personal.city|default:""|title }},
+                        {{ personal.province|default:""|title }}
+                      </span>
+                    </div>
+                    <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ personal.email|default:"" }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ personal.mobile_num|default:"" }}</span></div>
+                  </div>
+                </div>
+
+                <!-- Supporting Document -->
+                <div class="col-12 col-md-6">
+                  <div class="section-title mb-2 pt-4">Supporting Document</div>
+                  <div class="kv">
+                    <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ docs.valid_id_type_label|default:"" }}</span></div>
+
+                    <div class="doc-carousel carousel slide" id="staffDocCarousel" data-bs-ride="false" aria-label="Supporting documents">
+                      <div class="carousel-inner">
+                        <div class="carousel-item active">
+                          <div class="img-wrap">
+                            {% if docs.front_preview %}
+                              <img src="{{ docs.front_preview }}" class="doc-img" alt="Front of ID">
+                            {% elif docs.front_url %}
+                              <img src="{{ docs.front_url }}" class="doc-img" alt="Front of ID">
+                            {% else %}
+                              <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Front of ID">
+                            {% endif %}
+                          </div>
+                          <small class="text-muted d-block text-center mt-2">Front of ID</small>
+                        </div>
+
+                        <div class="carousel-item">
+                          <div class="img-wrap">
+                            {% if docs.back_preview %}
+                              <img src="{{ docs.back_preview }}" class="doc-img" alt="Back of ID">
+                            {% elif docs.back_url %}
+                              <img src="{{ docs.back_url }}" class="doc-img" alt="Back of ID">
+                            {% else %}
+                              <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Back of ID">
+                            {% endif %}
+                          </div>
+                          <small class="text-muted d-block text-center mt-2">Back of ID</small>
+                        </div>
+
+                        <div class="carousel-item">
+                          <div class="img-wrap">
+                            {% if docs.selfie_preview %}
+                              <img src="{{ docs.selfie_preview }}" class="doc-img" alt="Selfie with ID">
+                            {% elif docs.selfie_url %}
+                              <img src="{{ docs.selfie_url }}" class="doc-img" alt="Selfie with ID">
+                            {% else %}
+                              <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Selfie with ID">
+                            {% endif %}
+                          </div>
+                          <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
+                        </div>
+
+                        <div class="carousel-item">
+                          <div class="img-wrap">
+                            {% if docs.proof_preview %}
+                              <img src="{{ docs.proof_preview }}" class="doc-img" alt="Proof of Employment">
+                            {% elif docs.proof_url %}
+                              <img src="{{ docs.proof_url }}" class="doc-img" alt="Proof of Employment">
+                            {% else %}
+                              <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Proof of Employment">
+                            {% endif %}
+                          </div>
+                          <small class="text-muted d-block text-center mt-2">Proof of Employment</small>
+                        </div>
+                      </div>
+
+                      <button class="carousel-control-prev doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="prev" aria-label="Previous">
+                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                      </button>
+                      <button class="carousel-control-next doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="next" aria-label="Next">
+                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- /row -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Staff Role -->
+        <div class="rounded-3 border bg-light p-3 mt-4">
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Select Staff Role</label>
+              <div class="form-floating">
+                {{ role_form.role }}
+                <label for="{{ role_form.role.id_for_label }}">{{ role_form.role.label }}</label>
+              </div>
+              <div class="form-text">Choose the role to assign to this resident.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assign Purok/Sitio (always visible now) -->
+        <div class="purok-section-wrapper">
+          <div id="purok-section" class="rounded-3 border bg-light p-3 mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Assign Purok/Sitio</h6>
+              <button type="button" class="btn btn-submit btn-sm" id="add-purok">+ Add purok</button>
+            </div>
+
+            <div id="purok-list">
+              <!-- Row 0 uses your existing Django field -->
+              <div class="purok-row rounded-3 border bg-white p-3 mt-3" data-index="0">
+                <div class="row g-3 align-items-end">
+                  <div class="col-12">
+                    <label class="form-label small">Primary Purok/Sitio</label>
+                    <div class="form-floating">
+                      {{ role_form.purok_sitio }}
+                      <label for="{{ role_form.purok_sitio.id_for_label }}">{{ role_form.purok_sitio.label }}</label>
+                    </div>
+                    <div class="form-text">Required for Barangay Health Worker.</div>
+                  </div>
+                </div>
+                <div class="mt-2 d-flex justify-content-end">
+                  <button type="button" class="btn btn-reset btn-sm remove-purok d-none">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
+          <a type="button" class="btn btn-reset" href="{% url 'midwife:staff_selection_non-resident_docs' %}">Back</a>
+          <button type="button" class="btn btn-submit" id="submitBtn">Submit</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  // IDs from Django
+  const IDS = {
+    role: '{{ role_form.role.id_for_label }}',
+    purokPrimary: '{{ role_form.purok_sitio.id_for_label }}',
+  };
+
+  // Refs
+  const form         = document.querySelector('form[action$="{% url "midwife:staff_selection_non-resident_role_review" %}"]');
+  const roleSel      = document.getElementById(IDS.role);
+  const purokPrimary = document.getElementById(IDS.purokPrimary);
+  const purokList    = document.getElementById('purok-list');
+  const addPurokBtn  = document.getElementById('add-purok');
+
+  // Helpers
+  const val = (el) => el ? String(el.value || '').trim() : '';
+  const $el = (html) => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
+
+  // Flash
+  const flashScope = document.querySelector('.flash-scope') || (() => {
+    const host = document.querySelector('.container.px-3.py-4') || document.body;
+    const c = $el('<div class="flash-scope container px-3 pt-3"></div>');
+    host.parentNode.insertBefore(c, host);
+    return c;
+  })();
+  function showAlert(text, type='warning') {
+    if (!flashScope) return;
+    const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const icon = { success:'check-circle-fill', warning:'exclamation-circle-fill', danger:'exclamation-triangle-fill', info:'info-circle-fill' }[type] || 'info-circle-fill';
+    flashScope.insertAdjacentElement('afterbegin', $el(`
+      <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert" style="display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;margin-bottom:.75rem;">
+        <i class="bi bi-${icon}" style="font-size:1.1em;"></i>
+        <span>${esc(text)}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="margin-left:auto;position:static;"></button>
+      </div>`));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => flashScope.querySelectorAll('.alert.fade.show').forEach(el => bootstrap.Alert.getOrCreateInstance(el).close()), 8000);
+  }
+
+  // Dynamic Purok rows
+  function addPurokRow() {
+    if (!purokList || !purokPrimary) return;
+    const options = purokPrimary.innerHTML; // clone same options
+    const idx = purokList.querySelectorAll('.purok-row').length;
+    const row = $el(`
+      <div class="purok-row rounded-3 border bg-white p-3 mt-3" data-index="${idx}">
+        <div class="row g-3 align-items-end">
+          <div class="col-12">
+            <label class="form-label small">Additional Purok/Sitio</label>
+            <div class="form-floating">
+              <select class="form-select extra-purok" name="purok_sitio_ids[]" id="purok_sitio_extra_${idx}" aria-label="Additional Purok/Sitio">
+                ${options}
+              </select>
+              <label for="purok_sitio_extra_${idx}">Additional Purok/Sitio</label>
+            </div>
+            <div class="form-text">You may assign multiple puroks if needed.</div>
+          </div>
+        </div>
+        <div class="mt-2 d-flex justify-content-end">
+          <button type="button" class="btn btn-reset btn-sm remove-purok">Remove</button>
+        </div>
+      </div>
+    `);
+    row.querySelector('.remove-purok')?.addEventListener('click', () => row.remove());
+    purokList.appendChild(row);
+  }
+
+  addPurokBtn?.addEventListener('click', addPurokRow);
+  purokList?.addEventListener('click', (e) => {
+    if (e.target && e.target.classList.contains('remove-purok')) {
+      e.target.closest('.purok-row')?.remove();
+    }
+  });
+
+  // Submit checks
+  function checkDuplicatePurok() {
+    const extras = Array.from(document.querySelectorAll('#purok-list select[name="purok_sitio_ids[]"], #purok-list select.extra-purok'))
+      .map(s => val(s)).filter(Boolean);
+    const primary = val(purokPrimary);
+    const allVals = (primary ? [primary] : []).concat(extras);
+    if (allVals.length === 0) return { ok:false, msg:'Please assign at least one Purok/Sitio.', type:'warning' };
+    if (new Set(allVals).size !== allVals.length) return { ok:false, msg:'Duplicate Purok/Sitio selections are not allowed.', type:'danger' };
+    return { ok:true };
+  }
+
+  // Confirmation modal for Submit button
+  document.getElementById('submitBtn')?.addEventListener('click', function() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #007bff, #0056b3); border-radius: 50%;">
+                <i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Submission</h5>
+            <p class="text-muted mb-4">Are you sure you want to submit this staff account creation request?</p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-submit px-4 py-2" id="confirmSubmit">Yes, Submit</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.querySelector('#confirmSubmit').onclick = function() {
+      bsModal.hide();
+      form.submit();
+    };
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  });
+
+  form?.addEventListener('submit', (e) => {
+    // Always allow selecting a role, but only enforce Purok strictly for BHW (role_id=9)
+    const roleVal = val(roleSel);
+    if (!roleVal) { e.preventDefault(); showAlert('Please choose a staff role.', 'warning'); return; }
+
+    // If BHW, require at least one Purok and no duplicates.
+    if (roleVal === '9') {
+      const v = checkDuplicatePurok();
+      if (!v.ok) { e.preventDefault(); showAlert(v.msg, v.type); return; }
+    }
+    // For non-BHW roles, we let submission proceed even if no Purok is chosen.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, { passive:false });
+})();
+</script>
+{% endblock %}

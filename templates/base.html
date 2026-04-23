@@ -1,0 +1,56 @@
+{% load static %}
+
+{% load django_bootstrap5 %}
+{% load bootstrap_icons %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/header_pagetitle.css' %}">
+    <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    {# ⬇️ Added: BARUG modal theme CSS (safe to include globally) #}
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+
+    {% block css %}{% endblock %}
+
+    <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
+    <title>{{ page_title }}</title>
+</head>
+<body>
+    {% include 'header.html' %}
+    {% include 'account_management/'|add:user_role_template|add:'.html' %}   
+    {% include 'page_title.html' %} 
+    {% block content %}
+
+    {# ⬇️ Added: a single reusable modal instance available to all pages #}
+{% include "partials/modal.html" with
+    modal_id="barugSwitchModal"
+    title="Switch to another account"
+    subtitle="Would you like to switch to a different account role?"
+    hero_icon_bi="exclamation-lg"
+    show_close="true"
+    primary_label="Switch"
+    secondary_label="Cancel"
+    primary_variant="primary"   /* not used by the custom CSS but harmless */
+    secondary_variant="ghost"   /* not used by the custom CSS but harmless */
+%}
+
+{% endblock%}
+    {# ⬇️ Added: modal controller (depends on Bootstrap JS already loaded by {% bootstrap_javascript %}) #}
+    <script src="{% static 'js/modal.js' %}"></script>
+
+    {# keep your existing JS block last #}
+    {% block js %}{% endblock %}
+
+</body>
+</html>

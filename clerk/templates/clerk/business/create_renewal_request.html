@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --gold:#d4af37; --ink:#0f172a; --muted:#667085; --line:#e5e7eb; --bg:#fbf6f6; --card:#ffffff; --cap:#f6f7f9;
+    --ok:#0f5132; --ok-bg:#e8f7ef; --ok-br:#cce7da; --danger:#842029; --danger-bg:#fdeaea; --danger-br:#f5c2c7;
+  }
+  body{ background:var(--bg); }
+
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .btn-brand{ background:var(--brand-700); color:#fff; border-color:var(--brand-700); }
+  .btn-brand:hover{ filter:brightness(.96); color:#fff; }
+  .btn-subtle{ background:#fff; border:1px solid var(--line); }
+
+  .container-narrow{ width:min(1100px,100%); margin:0 auto; }
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 1px 0 rgba(16,24,40,.05); padding:18px; }
+  .section{ border:1px solid var(--line); border-left:4px solid var(--brand-700); border-radius:12px; background:#fff; padding:14px 14px 12px; }
+  .cap{ display:flex; align-items:center; gap:.6rem; background:var(--cap); border-radius:10px; padding:.5rem .75rem; margin:-.25rem -.25rem .75rem; border:1px solid #eef1f4; }
+  .cap .icon{ width:28px; height:28px; border-radius:999px; display:grid; place-items:center; background:#eef1f3; font-size:.98rem; }
+  .title{ font-weight:800; letter-spacing:.02em; }
+
+  .subtitle{ color:var(--muted); text-transform:uppercase; font-weight:800; letter-spacing:.08em; font-size:.78rem; }
+  .badge-id{ display:inline-block; padding:.25rem .5rem; border-radius:8px; background:#efe7e8; color:#54333a; font-weight:800; font-size:.72rem; }
+
+  .grid{ display:grid; grid-template-columns: 1fr 320px; gap:18px; }
+  @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } .sidebar{ position:static; } }
+
+  .row-grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
+  .col-4{ grid-column: span 4; } .col-3{ grid-column: span 3; } .col-2{ grid-column: span 2; } .col-6{ grid-column: span 6; } .col-12{ grid-column: span 12; }
+  @media (max-width: 720px){ .col-4,.col-3,.col-2,.col-6{ grid-column: span 12; } }
+  label{ display:block; font-size:.85rem; margin:2px 0 6px; color:var(--muted); font-weight:700; }
+  .form-control, .form-select{ border-radius:10px; }
+  .help{ color:var(--muted); font-size:.8rem; margin-top:6px; }
+
+  .pill{ display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .55rem; border-radius:999px; font-size:.73rem; font-weight:900; border:1px solid var(--line); }
+  .pill-ok{ background:var(--ok-bg); color:var(--ok); border-color:var(--ok-br); }
+  .pill-danger{ background:var(--danger-bg); color:var(--danger); border-color:var(--danger-br); }
+  .money{ font-weight:900; font-size:2rem; letter-spacing:.02em; }
+  .muted{ color:var(--muted); }
+
+  .table-wrap{ overflow:auto; max-height:48vh; border:1px solid var(--line); border-radius:12px; }
+  .table thead th{ position:sticky; top:0; background:#fafafa; z-index:1; }
+
+  .sidebar{ position:sticky; top:84px; height:fit-content; }
+  .kv{ display:grid; grid-template-columns: 1fr auto; gap:.35rem .75rem; }
+  .kv .label{ color:var(--muted); }
+  .kv .value{ font-weight:900; }
+  .divider{ height:1px; background:var(--line); margin:10px 0; }
+
+  .footer-stick{ position:sticky; bottom:0; background:#ffffffe8; backdrop-filter:saturate(120%) blur(4px); border-top:1px solid var(--line); padding:12px 16px; }
+
+  .mini-head .icon-blob{
+  width:40px; height:40px; border-radius:12px;
+  background:var(--cap); color:var(--brand-700);
+  display:grid; place-items:center; font-size:1rem;
+  box-shadow:0 1px 0 rgba(16,24,40,.04);
+}
+.tiny-meta{ color:var(--muted); font-weight:600; }
+.tiny-meta .sep{ margin:0 .35rem; color:#cbd5e1; }
+
+.chip-status{
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.3rem .65rem; border-radius:999px; font-size:.75rem; font-weight:800;
+  border:1px solid var(--line); letter-spacing:.02em;
+}
+.chip-status.ok{ background:var(--ok-bg); color:var(--ok); border-color:var(--ok-br); }
+.chip-status.danger{ background:var(--danger-bg); color:var(--danger); border-color:var(--danger-br); }
+.chip-status.muted{ background:#f3f4f6; color:var(--muted); border-color:#e5e7eb; }
+.tiny-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:.25rem .4rem; }
+.tiny-meta .sep{ margin:0 .25rem; color:#cbd5e1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow py-3" style="margin-top: 40px;">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div class="mini-head d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between w-100">
+      <!-- LEFT: Business + owner -->
+      <div class="d-flex align-items-start gap-3">
+        <div class="icon-blob"><i class="bi bi-building"></i></div>
+        <div>
+          <h4 class="mb-1 mb-lg-0">{{ business.business_name|default:"—"|title }}</h4>
+          <div class="tiny-meta">
+            <span class="badge-id" title="Business ID">{{ business.business_id|stringformat:"06d" }}</span>
+            <span class="sep">•</span>
+            <span class="badge-id no-case" title="Owner">{{ owner.owner_full_name|default:"—"|title }}</span>
+            <span class="sep">•</span>
+            <span class="badge-id" title="Owner Code">{{ owner.person_code|default:"—" }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Status (top-aligned, pretty chip) -->
+      <div class="status-stack mt-2 mt-lg-0">
+        <span class="badge-id">Clearance Year: <b>{{ clearance_year }}</b></span>
+        {% if header_status %}
+          <span class="chip-status
+            {% if header_status == 'ACTIVE' %}ok{% elif header_status == 'EXPIRED' %}danger{% else %}muted{% endif %}">
+            <i class="bi bi-activity"></i>{{ header_status }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+
+  <div class="grid">
+    <!-- MAIN -->
+    <main class="panel">
+      <!-- Breakdown (Preview from quote_rows) -->
+      <section class="section mb-3">
+        <div class="cap"><div class="icon">📋</div><div class="title">Breakdown (Preview)</div></div>
+        <div class="table-wrap">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:90px;">Year</th>
+                <th style="width:120px;">Kind</th>
+                <th class="text-end">Base Fee</th>
+                <th class="text-end">Offense #</th>
+                <th class="text-end">Surcharge</th>
+                <th class="text-end">Line Total</th>
+                <th>Deadline</th>
+                <th class="text-end">Days Late</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in quote_rows %}
+                <tr>
+                  <td>{{ r.item_year }}</td>
+                  <td>
+                    {% if r.kind == 'ARREARS' %}
+                      <span class="pill pill-danger">ARREARS</span>
+                    {% else %}
+                      <span class="pill pill-ok">CURRENT</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">₱ {{ r.base_fee|floatformat:2 }}</td>
+                  <td class="text-end">{{ r.offense_no|default:"—" }}</td>
+                  <td class="text-end">₱ {{ r.surcharge|floatformat:2 }}</td>
+                  <td class="text-end"><strong>₱ {{ r.total|floatformat:2 }}</strong></td>
+                  <td>{{ r.deadline|date:"Y-m-d"|default:"—" }}</td>
+                  <td class="text-end">{{ r.days_late|default:"—" }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="8" class="text-center text-muted">No items.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="table-light">
+                <th colspan="5" class="text-end">Grand Total</th>
+                <th class="text-end"><strong>₱ {{ grand_total|floatformat:2 }}</strong></th>
+                <th colspan="2"></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <!-- Paid history -->
+      <section class="section">
+        <div class="cap"><div class="icon">🧾</div><div class="title">Paid History</div></div>
+        <div class="table-wrap" style="max-height:260px;">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:90px;">Year</th>
+                <th>OR Number</th>
+                <th>Paid On</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in paid_rows %}
+                <tr>
+                  <td>{{ p.period_year }}</td>
+                  <td>{{ p.or_number|default:"—" }}</td>
+                  <td>{{ p.paid_on|date:"Y-m-d"|default:"—" }}</td>
+                  <td><span class="pill pill-ok">PAID</span></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted">No paid records.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Sticky footer for mobile -->
+      <div class="footer-stick d-flex d-lg-none gap-2 justify-content-end mt-3">
+        <a href="{% url 'clerk:business_information' b_id=business.business_id %}" class="btn btn-subtle">Cancel</a>
+        <button type="button" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#confirmModal">
+          <i class="bi bi-check2-circle me-1"></i> Save Renewal Request
+        </button>
+      </div>
+    </main>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar panel">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="muted">Summary</div>
+        <div class="fs-5">💰</div>
+      </div>
+      <div class="money mb-2">₱ {{ grand_total|floatformat:2 }}</div>
+
+      <div class="kv">
+        <div class="label">Base Fee</div><div class="value">₱ {{ base_sum|floatformat:2 }}</div>
+        <div class="label">Surcharge</div><div class="value">₱ {{ surch_sum|floatformat:2 }}</div>
+        <div class="label">Items</div><div class="value">{{ quote_rows|length }}</div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="muted">Preview date: <b>{% now "Y-m-d" %}</b></div>
+      <div class="divider"></div>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#confirmModal">Save Renewal Request</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Confirm Save Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Save</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Create a renewal request for <b>{{ business.business_name|default:"—" }}</b> totaling
+        <b>₱ {{ grand_total|floatformat:2 }}</b>?
+        <div class="text-muted mt-2 small">After save, status becomes <b>FOR_TREASURER_REVIEW</b>.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-subtle" data-bs-dismiss="modal">Not Now</button>
+        <form method="post" action="{% url 'clerk:create_renewal_request' b_id=business.business_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="business_id" value="{{ business.business_id }}">
+          <input type="hidden" name="period_type" value="ANNUAL">
+          <input type="hidden" name="period_year" value="{% now 'Y' %}">
+          <button type="submit" class="btn btn-brand">Yes, Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// no dynamic JS
+</script>
+{% endblock %}

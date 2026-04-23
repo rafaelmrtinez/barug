@@ -1,0 +1,157 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>403 • Unauthorized • {{ system_name|default:"BARUG" }}</title>
+
+  <!-- Tailwind & Font Awesome (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" />
+
+  <style>
+    :root{
+      /* BARUG—Maroon + Sand theme */
+      --brand-900:#3a1217;
+      --brand-800:#561c24;
+      --brand-700:#6d2932;   /* primary */
+      --brand-600:#7a323b;
+      --brand-300:#e8d8c4;   /* sand wash */
+      --brand-200:#f3ece3;
+      --brand-100:#fbf7f4;
+      --ink:#1f2937;
+      --muted:#6b7280;
+      --line:rgba(0,0,0,.08);
+    }
+
+    /* Baníg-inspired weave overlay + warm gradient */
+    .banig-bg{
+      background:
+        radial-gradient(120% 140% at 0% 0%, var(--brand-300) 0%, var(--brand-200) 60%, var(--brand-100) 100%),
+        url("data:image/svg+xml;utf8,\
+        <svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120' fill='none'>\
+          <g opacity='0.12'>\
+            <path d='M0 60h120M60 0v120' stroke='%23561224' stroke-width='6' stroke-opacity='.5'/>\
+            <path d='M0 0l120 120M120 0L0 120' stroke='%236d2932' stroke-width='3' stroke-opacity='.35'/>\
+          </g>\
+        </svg>") repeat;
+      background-size: cover, 220px 220px;
+    }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.72));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.65);
+    }
+    .soft-shadow{ box-shadow: 0 18px 50px rgba(0,0,0,.16); }
+    .floaty { animation: floaty 8s ease-in-out infinite; }
+    @keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+  </style>
+</head>
+
+<body class="min-h-screen banig-bg overflow-x-hidden">
+
+  <!-- Top Ribbon: Barangay identity with your provided seal -->
+  <header class="w-full">
+    <div class="mx-auto max-w-5xl px-6 pt-8">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-full bg-white ring-2 ring-[var(--brand-700)] overflow-hidden flex items-center justify-center">
+          <!-- USE THIS EXACT PATH -->
+            <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño Seal" class="w-12 h-12 object-contain" />
+        </div>
+        <div class="leading-tight">
+          <p class="text-xs tracking-widest font-semibold text-[var(--brand-700)] uppercase">
+            {{ system_name|default:"BARUG" }} • Barangay Information System
+          </p>
+          <h1 class="text-lg md:text-xl font-bold text-[var(--ink)]">
+            {{ barangay_name|default:"Barangay Sto. Niño" }}, {{ city_name|default:"Cebu City" }}
+          </h1>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="relative px-6 pb-12 pt-6 md:pt-10">
+    <div class="mx-auto max-w-5xl">
+      <!-- Decorative bubbles -->
+      <div class="pointer-events-none absolute -top-6 right-6 w-24 h-24 md:w-28 md:h-28 rounded-full bg-[var(--brand-300)] opacity-70 floaty"></div>
+      <div class="pointer-events-none absolute -bottom-10 left-10 w-28 h-28 md:w-36 md:h-36 rounded-full bg-[var(--brand-200)] opacity-70 floaty" style="animation-delay:-3s"></div>
+
+      <!-- Main Card -->
+      <section class="glass soft-shadow rounded-3xl p-6 md:p-10">
+        <div class="flex items-start md:items-center gap-5">
+          <div class="flex-none w-16 h-16 rounded-2xl bg-[var(--brand-100)] border border-[var(--line)] flex items-center justify-center">
+            <i class="fas fa-ban text-2xl text-[var(--brand-700)]"></i>
+            <span class="sr-only">Access blocked</span>
+          </div>
+          <div class="min-w-0">
+            <span class="inline-flex items-center text-[var(--brand-700)] font-semibold tracking-wide uppercase text-xs">
+              Error 403
+              <span class="ml-2 inline-block px-2 py-0.5 rounded bg-[var(--brand-300)] text-[var(--brand-900)]">Unauthorized</span>
+            </span>
+            <h2 class="mt-1 text-3xl md:text-4xl font-extrabold text-[var(--ink)] leading-tight">
+              Access to this page is not allowed
+            </h2>
+            <p class="mt-2 text-[var(--muted)]">
+              If you believe this is a mistake, request the proper authorization from your Barangay Administrator.
+            </p>
+          </div>
+        </div>
+
+        <!-- Advisory tiles -->
+        <div class="mt-8 grid md:grid-cols-3 gap-4">
+          <div class="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-xl bg-[var(--brand-100)] flex items-center justify-center">
+                <i class="fas fa-id-card text-[var(--brand-700)]"></i>
+              </div>
+              <div>
+                <p class="font-semibold text-[var(--ink)]">Verify assignment</p>
+                <p class="text-sm text-[var(--muted)]">Ensure your staff assignment or privileges cover this module.</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-xl bg-[var(--brand-100)] flex items-center justify-center">
+                <i class="fas fa-sitemap text-[var(--brand-700)]"></i>
+              </div>
+              <div>
+                <p class="font-semibold text-[var(--ink)]">Use the correct route</p>
+                <p class="text-sm text-[var(--muted)]">Some pages are exclusive to Clerk, Treasurer, BHW, or Admin roles.</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-xl bg-[var(--brand-100)] flex items-center justify-center">
+                <i class="fas fa-headset text-[var(--brand-700)]"></i>
+              </div>
+              <div>
+                <p class="font-semibold text-[var(--ink)]">Need assistance?</p>
+                <p class="text-sm text-[var(--muted)]">Contact your Barangay Administrator to request access.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+<!-- Actions -->
+<div class="mt-8 flex justify-center">
+  <button type="button" onclick="history.back()"
+          class="inline-flex items-center justify-center px-5 py-3 rounded-xl
+                 border border-[var(--brand-700)] text-[var(--brand-700)] font-medium
+                 bg-white hover:bg-[var(--brand-100)] transition">
+    <i class="fas fa-arrow-left mr-2"></i> Go Back
+  </button>
+</div>
+
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6; --ring: rgba(109,41,50,.18);
+    --accent:#D4AF37; --ink:#212529; --muted:#6c757d; --card:#ffffff;
+  }
+  body{background:linear-gradient(160deg, var(--brand-050), #fff 30%)}
+  .page-head{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem; }
+  .title{ margin:0; letter-spacing:.2px; color:var(--brand-700); font-weight:800; }
+  .sub{ color:var(--muted); font-size:.925rem }
+
+  .search-card{
+    background:var(--card);
+    border:1px solid rgba(109,41,50,.12);
+    border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+  }
+  .searchbar{
+    display:flex; align-items:center; gap:.625rem; padding:.75rem; border:1px solid rgba(109,41,50,.18);
+    border-radius:12px; outline:3px solid transparent; transition:.2s;
+    background:#fff;
+  }
+  .searchbar:focus-within{ outline:3px solid var(--ring); border-color:var(--brand-700) }
+  .searchbar input{
+    border:none; outline:none; flex:1; font-size:1rem; background:transparent;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800) }
+  .badge-soft{
+    background:var(--brand-050); color:var(--brand-700);
+    border:1px solid rgba(109,41,50,.18); padding:.25rem .5rem; border-radius:999px; font-size:.8rem;
+  }
+  .list{
+    border:1px solid rgba(109,41,50,.12); border-radius:14px; overflow:hidden; background:#fff;
+  }
+  .row-item{
+    display:grid; grid-template-columns: 1fr auto; gap:.75rem;
+    padding:.75rem .9rem; border-bottom:1px dashed rgba(0,0,0,.06);
+    cursor:pointer; align-items:center;
+  }
+  .row-item:hover{ background:var(--brand-100) }
+  .row-item.active{ background:#fff7e6; border-left:4px solid var(--accent); }
+  .row-title{ font-weight:600; color:#222; }
+  .row-sub{ color:var(--muted); font-size:.9rem }
+  .kbd{
+    display:inline-flex; align-items:center; justify-content:center; min-width:1.25rem;
+    padding:.1rem .35rem; border:1px solid #d0d5dd; border-bottom-width:2px; border-radius:6px;
+    font-size:.75rem; background:#fff; color:#444
+  }
+  .empty{ padding:2rem; text-align:center; color:var(--muted) }
+  .side{
+    border:1px solid rgba(109,41,50,.12);
+    border-radius:14px; padding:1rem; background:#fff;
+  }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .copy-chip{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem;
+    border:1px dashed rgba(0,0,0,.2); border-radius:999px; cursor:pointer; user-select:none;
+  }
+  .copy-chip:hover{ background: #faf6ee; }
+  .pill{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .55rem; border-radius:999px;
+    background:var(--brand-100); border:1px solid rgba(109,41,50,.15); color:var(--brand-800); font-weight:600; font-size:.85rem;
+  }
+  @media (max-width: 991px){
+    .grid{ display:block }
+    .side{ margin-top:1rem }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="page-head">
+    <div>
+      <h2 class="title">Resident Lookup</h2>
+      <div class="sub">Search residents, confirm details, and copy or use their <span class="mono">person_id</span>.</div>
+    </div>
+    <div>
+      {% if target_input %}
+      <span class="badge-soft">Target input: <span class="mono">{{ target_input }}</span></span>
+      {% else %}
+      <span class="badge-soft">Standalone mode</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="search-card p-3 mb-3">
+    <div class="searchbar" id="searchbar">
+      <i class="bi bi-search" style="font-size:1.05rem;color:var(--muted)"></i>
+      <input id="q" type="text" placeholder="Type a name (at least 2 characters) — e.g., 'Juan', 'Dela Cruz'">
+      <button id="btnClear" class="btn btn-sm btn-outline-secondary">Clear</button>
+    </div>
+
+    <div class="mt-3 d-flex align-items-center justify-content-between">
+      <div class="text-muted small">Tips: Use <span class="kbd">↑</span>/<span class="kbd">↓</span> to move, <span class="kbd">Enter</span> to select.</div>
+      <div class="text-muted small"><span id="statusText">Waiting for input…</span></div>
+    </div>
+  </div>
+
+  <div class="grid row g-3">
+    <div class="col-lg-7">
+      <div class="list" id="resultList" role="listbox" aria-label="Resident search results">
+        <div class="empty">Start typing to search residents.</div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="side">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="m-0" style="letter-spacing:.2px;color:var(--brand-700);font-weight:800">Selected Resident</h6>
+          <span class="pill" id="selectedState"><i class="bi bi-info-circle"></i> None</span>
+        </div>
+        <div id="selectedCard">
+          <div class="text-muted">Pick a resident on the left to see details here.</div>
+        </div>
+        <hr class="my-3">
+        <div class="d-flex gap-2">
+          <button id="btnCopy" class="btn btn-outline-secondary" disabled>
+            <i class="bi bi-clipboard"></i> Copy ID
+          </button>
+          <button id="btnUse" class="btn btn-brand" disabled>
+            <i class="bi bi-check2-circle"></i> Use this person
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $q = document.getElementById('q');
+  const $list = document.getElementById('resultList');
+  const $status = document.getElementById('statusText');
+  const $btnClear = document.getElementById('btnClear');
+  const $selectedCard = document.getElementById('selectedCard');
+  const $selectedState = document.getElementById('selectedState');
+  const $btnCopy = document.getElementById('btnCopy');
+  const $btnUse = document.getElementById('btnUse');
+
+  const TARGET_INPUT = "{{ target_input|default_if_none:'' }}";
+  let results = [];
+  let activeIndex = -1;
+  let selected = null;
+
+  function debounce(fn, ms){
+    let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), ms); };
+  }
+
+  function setStatus(text){ $status.textContent = text; }
+
+  function renderList(){
+    if(!results.length){
+      $list.innerHTML = '<div class="empty">No results. Try a different name.</div>';
+      return;
+    }
+    const html = results.map((r,idx)=>`
+      <div class="row-item ${idx===activeIndex?'active':''}" role="option" aria-selected="${idx===activeIndex}" data-index="${idx}">
+        <div>
+          <div class="row-title">${escapeHtml(r.name)}</div>
+          <div class="row-sub">ID: <span class="mono">${r.id}</span></div>
+        </div>
+        <div class="text-end">
+          <span class="badge-soft">Press Enter</span>
+        </div>
+      </div>
+    `).join('');
+    $list.innerHTML = html;
+    Array.from($list.querySelectorAll('.row-item')).forEach(el=>{
+      el.addEventListener('click', ()=> {
+        activeIndex = parseInt(el.dataset.index,10);
+        commitActive();
+      });
+      el.addEventListener('mousemove', ()=>{
+        const i = parseInt(el.dataset.index,10);
+        if(i!==activeIndex){ activeIndex = i; renderList(); }
+      });
+    });
+  }
+
+  function escapeHtml(s){
+    return (s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+  }
+
+  async function fetchSuggest(q){
+    const url = new URL("{% url 'lupon_mem:person_suggest' %}", window.location.origin);
+    url.searchParams.set('q', q);
+    const res = await fetch(url.toString(), { credentials:'same-origin' });
+    if(!res.ok) throw new Error('Suggest failed');
+    const data = await res.json();
+    return data.results || [];
+  }
+
+  async function fetchDetail(personId){
+    const url = new URL("{% url 'lupon_mem:person_lookup' %}", window.location.origin);
+    url.searchParams.set('person_id', personId);
+    const res = await fetch(url.toString(), { credentials:'same-origin' });
+    if(!res.ok) throw new Error('Lookup failed');
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'Lookup err');
+    return data.person;
+  }
+
+  const doSearch = debounce(async ()=>{
+    const q = $q.value.trim();
+    selected = null;
+    updateSide();
+    if(q.length < 2){
+      setStatus('Type at least 2 characters.');
+      $list.innerHTML = '<div class="empty">Type at least 2 characters to search.</div>';
+      results = []; activeIndex = -1;
+      return;
+    }
+    try{
+      setStatus('Searching…');
+      const items = await fetchSuggest(q);
+      results = items;
+      activeIndex = items.length ? 0 : -1;
+      renderList();
+      setStatus(`${items.length} result${items.length===1?'':'s'}`);
+    }catch(e){
+      setStatus('Search failed.');
+      console.error(e);
+    }
+  }, 250);
+
+  function updateSide(){
+    if(!selected){
+      $selectedCard.innerHTML = '<div class="text-muted">Pick a resident on the left to see details here.</div>';
+      $selectedState.innerHTML = '<i class="bi bi-info-circle"></i> None';
+      $btnCopy.disabled = true;
+      $btnUse.disabled = true;
+      return;
+    }
+    const sex = selected.sex ? ` • ${selected.sex}` : '';
+    const bday = selected.birthdate ? ` • ${selected.birthdate}` : '';
+    const addr = selected.address_text ? `<div class="text-muted mt-1"><i class="bi bi-geo-alt"></i> ${escapeHtml(selected.address_text)}</div>` : '';
+    $selectedCard.innerHTML = `
+      <div class="d-flex align-items-start justify-content-between">
+        <div>
+          <div class="fw-bold" style="font-size:1.05rem">${escapeHtml(selected.name)}</div>
+          <div class="text-muted small">${sex}${bday}</div>
+          ${addr}
+          <div class="mt-2">
+            <span class="copy-chip" id="chipCopy"><i class="bi bi-clipboard"></i> <span class="mono">person_id=${selected.person_id}</span></span>
+          </div>
+        </div>
+      </div>
+    `;
+    $selectedState.innerHTML = `<i class="bi bi-person-check"></i> Selected`;
+    $btnCopy.disabled = false;
+    $btnUse.disabled = false;
+    const chip = document.getElementById('chipCopy');
+    if(chip) chip.addEventListener('click',()=> copyId());
+  }
+
+  async function commitActive(){
+    if(activeIndex<0 || activeIndex>=results.length) return;
+    const base = results[activeIndex];
+    try{
+      const detail = await fetchDetail(base.id);
+      selected = detail;
+      updateSide();
+    }catch(e){
+      console.error(e);
+    }
+    renderList();
+  }
+
+  function copyId(){
+    if(!selected) return;
+    navigator.clipboard.writeText(String(selected.person_id)).then(()=>{
+      flash('Copied!');
+    }).catch(()=>{ /* noop */ });
+  }
+
+  function flash(text){
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.position = 'fixed';
+    el.style.bottom = '16px';
+    el.style.right = '16px';
+    el.style.background = '#111';
+    el.style.color = '#fff';
+    el.style.padding = '.5rem .75rem';
+    el.style.borderRadius = '10px';
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .2s, transform .2s';
+    el.style.transform = 'translateY(6px)';
+    document.body.appendChild(el);
+    requestAnimationFrame(()=>{
+      el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+      setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(),200)}, 900);
+    });
+  }
+
+  function usePerson(){
+    if(!selected) return;
+    // If opened from a form and ?target=someInputId was provided, try to fill it.
+    if(TARGET_INPUT){
+      try{
+        // Same window:
+        const input = document.getElementById(TARGET_INPUT);
+        if(input){
+          input.value = selected.person_id;
+          flash('Filled target input');
+          return;
+        }
+        // Opener window (popup):
+        if(window.opener && !window.opener.closed){
+          const winInput = window.opener.document.getElementById(TARGET_INPUT);
+          if(winInput){ winInput.value = selected.person_id; flash('Filled opener input'); window.close(); return; }
+        }
+        // Parent (iframe/modal host):
+        if(window.parent && window.parent !== window){
+          window.parent.postMessage({ type:'residentPicked', target:TARGET_INPUT, person_id:selected.person_id }, '*');
+          flash('Sent to parent window');
+          return;
+        }
+      }catch(e){ /* cross-origin or not found */ }
+    }
+    // Fallback: just copy
+    copyId();
+  }
+
+  // Events
+  $q.addEventListener('input', doSearch);
+  $btnClear.addEventListener('click', ()=>{ $q.value=''; results=[]; activeIndex=-1; renderList(); setStatus('Cleared.'); selected=null; updateSide(); $q.focus(); });
+
+  document.addEventListener('keydown', (e)=>{
+    const hasResults = results.length>0;
+    if(e.key === 'ArrowDown' && hasResults){ e.preventDefault(); activeIndex = Math.min(activeIndex+1, results.length-1); renderList(); }
+    if(e.key === 'ArrowUp'   && hasResults){ e.preventDefault(); activeIndex = Math.max(activeIndex-1, 0); renderList(); }
+    if(e.key === 'Enter'     && hasResults){ e.preventDefault(); commitActive(); }
+  });
+
+  $btnCopy.addEventListener('click', copyId);
+  $btnUse.addEventListener('click', usePerson);
+})();
+</script>
+{% endblock %}

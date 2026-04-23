@@ -1,0 +1,106 @@
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+  <div>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText2"
+            aria-controls="navbarText2" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarText2">
+      <ul class="navbar-nav me-auto mb-lg-0">
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'lupon_mem:dashboard' %}">Dashboard</a>
+        </li>
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'lupon_mem:incident_heatmap' %}">Incident Heatmap</a>
+        </li>
+<!--  -->
+        <!-- Blotter Reports (badge) -->
+        <!-- <li class="nav-item dropdown me-3">
+          <a class="nav-link dropdown-toggle position-relative" href="#" id="reports_dropdown"
+             role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Blotter Reports
+            {% if unpaid_reports_count|default_if_none:0 %}
+              <span class="badge rounded-pill text-bg-danger ms-1"
+                    title="Unpaid or no-payment reports">{{ unpaid_reports_count }}</span>
+            {% endif %}
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="reports_dropdown">
+            <li>
+              <a class="dropdown-item d-flex align-items-center justify-content-between"
+                 href="{% url 'lupon_mem:report_list' %}">
+                See Reports
+                {% if unpaid_reports_count|default_if_none:0 %}
+                  <span class="badge text-bg-danger">{{ unpaid_reports_count }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li><a class="dropdown-item" href="{% url 'lupon_mem:resident_records_list' %}">Resident Records</a></li>
+          </ul>
+        </li> -->
+
+                <!-- Blotter Reports (badge) -->
+        <!-- <li class="nav-item dropdown me-3">
+          <a class="nav-link dropdown-toggle position-relative" href="#" id="reports_dropdown"
+             role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Blotter Reports
+            {% if unpaid_reports_count|default_if_none:0 %}
+              <span class="badge rounded-pill text-bg-danger ms-1"
+                    title="Unpaid or no-payment reports">{{ unpaid_reports_count }}</span>
+            {% endif %}
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="reports_dropdown">
+            <li>
+              <a class="dropdown-item d-flex align-items-center justify-content-between"
+                 href="{% url 'lupon_mem:report_list' %}">
+                See Reports
+                {% if unpaid_reports_count|default_if_none:0 %}
+                  <span class="badge text-bg-danger">{{ unpaid_reports_count }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li><a class="dropdown-item" href="{% url 'lupon_mem:resident_records_list' %}">Resident Records</a></li>
+          </ul>
+        </li> -->
+
+
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'lupon_mem:report_list' %}">Blotter Reports</a>
+        </li>
+
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'lupon_mem:case_list' %}">Barangay Cases</a>
+        </li>
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'lupon_mem:hearing_list' %}">All Hearings</a>
+        </li>
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'lupon_mem:resident_records_list' %}">Resident Records</a>
+        </li>
+        <!-- Barangay Cases (badge) -->
+        <!-- <li class="nav-item dropdown me-3">
+          <a class="nav-link dropdown-toggle position-relative" href="#" id="cases_dropdown"
+             role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Barangay Cases
+            {% if unpaid_cases_count|default_if_none:0 %}
+              <span class="badge rounded-pill text-bg-danger ms-1"
+                    title="Unpaid or no-payment cases">{{ unpaid_cases_count }}</span>
+            {% endif %}
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="cases_dropdown">
+            <li>
+              <a class="dropdown-item d-flex align-items-center justify-content-between"
+                 href="{% url 'lupon_mem:case_list' %}">
+                Cases
+                {% if unpaid_cases_count|default_if_none:0 %}
+                  <span class="badge text-bg-danger">{{ unpaid_cases_count }}</span>
+                {% endif %}
+              </a>
+            </li>
+            <li><a class="dropdown-item" href="{% url 'clerk:walkin_new' %}">Walk-in Request</a></li>
+            <li><a class="dropdown-item" href="{% url 'clerk:queue' %}">Request History</a></li>
+          </ul>
+        </li> -->
+      </ul>
+    </div>
+  </div>
+</nav>

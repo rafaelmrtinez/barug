@@ -1,0 +1,1753 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+<link rel="stylesheet" href="{% static 'css/modal.css' %}">
+<script src="{% static 'js/schedule.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 60px; padding-top: 1rem; padding-bottom: 0.5rem;">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-9">
+      <!-- Back Button -->
+      <div class="mb-3">
+        <a href="{% url 'superadmin:staff_list' %}" class="btn btn-reset px-3 py-2">
+          {% bs_icon 'arrow-left' size='1.2em' %}
+        </a>
+      </div>
+      
+      <!-- Header Card -->
+      <div class="card border-0 shadow-sm mb-3" style="border-radius: 14px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3" style="width: 70px; height: 70px;">
+              {% if profile.staff_img %}
+                <img src="{{ profile.staff_img }}" alt="{{ profile.first_name }} {{ profile.last_name }}" class="rounded-circle shadow-sm" style="width: 100%; height: 100%; object-fit: cover;">
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center text-white rounded-circle shadow-sm" style="width: 100%; height: 100%; font-size: 24px; font-weight: 600; background: var(--bs-danger-text-emphasis);">
+                  {{ profile.first_name|first|upper }}{{ profile.last_name|first|upper }}
+                </div>
+              {% endif %}
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <h4 class="mb-0 fw-bold text-dark">
+                  {{ profile.first_name|default:""|title }}
+                  {% with m=profile.middle_name|default_if_none:'' %}
+                    {% if m %} {{ m|slice:":1"|upper }}.{% endif %}
+                  {% endwith %}
+                  {{ profile.last_name|default:""|title }}
+                  {{ profile.suffix|default:""|upper }}
+                </h4>
+                {% with s=profile.account_status|default:"" %}
+                  <span class="badge px-2 py-1 rounded-pill
+                    {% if s|lower == 'active' %} bg-success text-white
+                    {% elif s|lower == 'pending' %} bg-warning text-dark
+                    {% elif s|lower == 'inactive' %} bg-secondary text-white
+                    {% elif s|lower == 'deactivated' %} bg-danger text-white
+                    {% else %} bg-light text-dark
+                    {% endif %}
+                  " style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ s|default:"Unknown" }}</span>
+                {% endwith %}
+              </div>
+              <div class="mb-2">
+                <span class="text-muted fw-medium">{{ profile.staff_code|default:"No Code" }}</span>
+              </div>
+              <div class="text-muted mb-0 fw-medium">
+                {% if profile.role %}
+                  {% if profile.role|length > 1 %}
+                    {% for role in profile.role %}
+                      <span class="badge me-1 mb-1" style="background: var(--bs-danger-text-emphasis); color: white; font-size: 0.75rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">{{ role }}</span>
+                    {% endfor %}
+                  {% else %}
+                    {{ profile.role.0|default:"No Role Assigned" }}
+                  {% endif %}
+                {% else %}
+                  No Role Assigned
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Information Cards Grid -->
+      <div class="row g-3 mb-3">
+        <!-- Personal Information -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                  <h6 class="mb-0 ms-2 fw-bold text-dark">Personal Information</h6>
+                </div>
+                {% if profile.residential_status == 'Non Resident' %}
+                  <button type="button" class="btn btn-submit btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#updatePersonalInfoModal">
+                    {% bs_icon 'pencil-square' %} Update
+                  </button>
+                {% endif %}
+              </div>
+              
+              <!-- Address Card -->
+              <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 mt-1">
+                    {% bs_icon 'geo-alt-fill' color='#6c757d' %}
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="text-muted fw-medium mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Home Address</div>
+                    {% if profile.home_address %}
+                      <div class="text-dark fw-medium">{{ profile.home_address }}</div>
+                    {% else %}
+                      <div class="text-muted fw-medium">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Personal Details Grid -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'person-badge' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Gender</span>
+                    </div>
+                    {% if profile.sex %}
+                      <div class="text-dark fw-bold">{{ profile.sex }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'calendar-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Birth Date</span>
+                    </div>
+                    {% if profile.date_of_birth %}
+                      <div class="text-dark fw-bold">{{ profile.date_of_birth|date:"M d, Y" }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'heart-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Civil Status</span>
+                    </div>
+                    {% if profile.civil_status %}
+                      <div class="text-dark fw-bold">{{ profile.civil_status }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'flag-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Nationality</span>
+                    </div>
+                    {% if profile.nationality %}
+                      <div class="text-dark fw-bold">{{ profile.nationality }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Contact Info -->
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'envelope-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Email</span>
+                    </div>
+                    <div class="text-dark fw-bold">
+                      {% if profile.email_address %}
+                        <a href="mailto:{{ profile.email_address }}" class="text-decoration-none">{{ profile.email_address }}</a>
+                      {% else %}
+                        <div class="text-muted fw-semibold">
+                          Not Provided
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'telephone-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Mobile</span>
+                    </div>
+                    {% if profile.mobile_number %}
+                      <div class="text-dark fw-bold">
+                        {{ profile.mobile_number }}
+                      </div>
+                    {% else %}
+                      <div class="text-muted fw-semibold">
+                        Not Provided
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Residential Status Info -->
+              {% if profile.residential_status != 'Non Resident' %}
+                <div class="mt-3 p-2 rounded-3" style="background: #e3f2fd; border-left: 3px solid #2196f3;">
+                  <small class="text-muted fw-medium">
+                    {% bs_icon 'info-circle' extra_classes='me-1' %}
+                    Only BHW can update resident information
+                  </small>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Staff Information & Documents -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  {% bs_icon 'briefcase-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                  <h6 class="mb-0 ms-2 fw-bold text-dark">Staff Information</h6>
+                </div>
+                {% if profile.account_status|lower == 'deactivated' %}
+                  <span class="text-muted small">{% bs_icon 'lock-fill' %} Cannot update deactivated account</span>
+                {% else %}
+                  <button id="btn-primary" type="button" class="btn btn-submit btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#updateModal">
+                    {% bs_icon 'pencil-square' %} Update
+                  </button>
+                {% endif %}
+              </div>
+              
+              <!-- Staff Details -->
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <div class="p-2 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'calendar-check' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Account Started</span>
+                    </div>
+                    {% if profile.date_started %}
+                      <div class="text-dark fw-bold" style="font-size: 0.875rem;">{{ profile.date_started|date:"M d, Y" }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold" style="font-size: 0.875rem;">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-2 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'calendar-x' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Account Ended</span>
+                    </div>
+                    {% if profile.date_end %}
+                      <div class="text-dark fw-bold" style="font-size: .875rem;">
+                        {{ profile.date_end|date:"M d, Y" }}
+                      </div>
+                    {% else %}
+                      <div class="text-muted fw-semibold" style="font-size: .875rem;">
+                        Currently Assigned
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              {% if 'Barangay Health Worker' in profile.role %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'geo-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Purok/Sitio</div>
+                      <div class="{% if profile.assigned_purok %}text-dark fw-bold{% else %}text-muted{% endif %}" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.assigned_purok|default:"Not Yet Assigned" }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% elif profile.assigned_purok %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'geo-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Purok/Sitio</div>
+                      {% if profile.assigned_purok %}
+                        <div class="text-dark fw-semibold style="white-space:pre-line; font-size: 0.9rem;">{{ profile.assigned_purok }}</div>
+                      {% else %}
+                        <div class="text-muted fw-semibold" style="white-space:pre-line; font-size: 0.9rem;">Not Yet Assigned</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              {% if 'Barangay Lupon Member' in profile.role %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'clock-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Schedule</div>
+                      {% if profile.schedule %}
+                        <div class="text-dark fw-semibold" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.schedule }}</div>
+                      {% else %}
+                        <div class="text-muted fw-semibold" style="white-space:pre-line; font-size: 0.9rem;">Not Yet Assigned</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% elif profile.schedule %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'clock-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Schedule</div>
+                      <div class="text-dark fw-bold" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.schedule }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <!-- Documents Section -->
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'file-earmark-text-fill' color='var(--bs-danger-text-emphasis)' size='1.1em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark" style="font-size: 0.95rem;">Supporting Documents</h6>
+              </div>
+              
+              <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">ID Type</div>
+                {% if profile.id_type_name %}
+                  <div class="text-dark fw-bold" style="font-size: 0.9rem;">{{ profile.id_type_name|upper }}</div>
+                {% else %}
+                  <div class="text-muted fw-bold" style="font-size: 0.9rem;">Not Provided</div>
+                {% endif %}
+              </div>
+              
+              {% if doc_slides %}
+                <div class="doc-carousel carousel slide mb-3" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+                  <div class="carousel-inner">
+                    {% for s in doc_slides %}
+                      <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                        <div class="img-wrap">
+                          <img src="{{ s.src }}" class="doc-img" alt="{{ s.label }}">
+                        </div>
+                        <small class="text-muted d-block text-center mt-2 fw-medium">{{ s.label }}</small>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                  </button>
+                  <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                  </button>
+                </div>
+              {% endif %}
+              
+              <div class="p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="text-muted fw-medium mb-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
+                {% if profile.proof_of_employment_paths %}
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for proof_path in profile.proof_of_employment_paths %}
+                      <a href="{{ proof_path }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document {{ forloop.counter }}</a>
+                    {% endfor %}
+                  </div>
+                {% elif profile.proof_of_employment_path %}
+                  <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document 1</a>
+                  </div>
+                {% else %}
+                  <div class="text-muted fw-semibold" style="font-size: 0.9rem;">Not Provided</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+    </div>
+  </div>
+</div>
+
+<!-- Update Modal -->
+<div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header" style="background-color: var(--bs-danger-text-emphasis); color: white;">
+        <h5 class="modal-title" id="updateModalLabel">Update Staff Information</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- Staff Information Card -->
+          <div class="card border-0 bg-light mb-4" style="border-radius: 12px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center mb-3">
+                {% if profile.staff_img %}
+                  <div class="me-3" style="width: 48px; height: 48px;">
+                    <img src="{{ profile.staff_img }}" alt="{{ profile.first_name }} {{ profile.last_name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
+                  </div>
+                {% else %}
+                  <div class="d-flex align-items-center justify-content-center text-white rounded-circle me-3" style="width: 48px; height: 48px; font-size: 18px; font-weight: 600; background: var(--bs-danger-text-emphasis);">
+                    {{ profile.first_name|first|upper }}{{ profile.last_name|first|upper }}
+                  </div>
+                {% endif %}
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <h6 class="mb-0 fw-semibold">
+                      {{ profile.first_name|default:""|title }}
+                      {% with m=profile.middle_name|default_if_none:'' %}
+                        {% if m %} {{ m|slice:":1"|upper }}.{% endif %}
+                      {% endwith %}
+                      {{ profile.last_name|default:""|title }}
+                      {{ profile.suffix|default:""|upper }}
+                    </h6>
+                    {% with s=profile.account_status|default:"" %}
+                      <span class="badge badge-sm
+                        {% if s|lower == 'active' %} bg-success
+                        {% elif s|lower == 'pending' %} bg-warning text-dark
+                        {% elif s|lower == 'inactive' %} bg-secondary
+                        {% elif s|lower == 'deactivated' %} bg-danger
+                        {% else %} bg-light text-dark
+                        {% endif %}
+                      ">{{ s|default:"—" }}</span>
+                    {% endwith %}
+                  </div>
+                  <small class="text-muted">{{ profile.staff_code|default:"" }}</small>
+                </div>
+              </div>
+              <!-- Address Section -->
+              <div class="mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.7);">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 mt-1">
+                    {% bs_icon 'geo-alt-fill' color='#6c757d' %}
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Home Address</div>
+                    {% if profile.home_address %}
+                      <div class="text-dark fw-medium">{{ profile.home_address }}</div>
+                    {% else %}
+                      <div class="text-muted fw-medium">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Personal Details Grid -->
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <div class="p-2 rounded-3 h-100" style="background: rgba(255,255,255,0.7);">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'person-fill' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Gender</span>
+                    </div>
+                    {% if profile.sex %}
+                      <div class="text-dark fw-bold" style="font-size: 0.875rem;">{{ profile.sex }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold" style="font-size: 0.875rem;">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="p-2 rounded-3 h-100" style="background: rgba(255,255,255,0.7);">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'heart-fill' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Civil Status</span>
+                    </div>
+                    {% if profile.civil_status %}
+                      <div class="text-dark fw-bold" style="font-size: 0.875rem;">{{ profile.civil_status }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold" style="font-size: 0.875rem;">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="p-2 rounded-3 h-100" style="background: rgba(255,255,255,0.7);">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'calendar-fill' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Birth Date</span>
+                    </div>
+                    {% if profile.date_of_birth %}
+                      <div class="text-dark fw-bold" style="font-size: 0.875rem;">{{ profile.date_of_birth|date:"M d, Y" }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold" style="font-size: 0.875rem;">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Role Selection with Chips -->
+          <div class="mb-4">
+            <label class="form-label small fw-semibold">Staff Roles</label>
+            
+            <!-- Current Roles Display -->
+            <div id="selected-roles" class="d-flex flex-wrap gap-2 p-3 mb-3" style="background: rgba(255,255,255,0.7); border: 2px dashed rgba(var(--bs-danger-text-emphasis-rgb), 0.3); border-radius: 12px; min-height: 60px;">
+              {% if profile.role and profile.role|length > 0 %}
+                {% for role in profile.role %}
+                  <div class="role-chip d-flex align-items-center gap-1 px-2 py-1" style="background: var(--bs-danger-text-emphasis); color: white; border-radius: 16px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);">
+                    <span>{{ role }}</span>
+                    <button type="button" class="btn p-0 text-white remove-role" data-role="{{ role }}" style="background: none; border: none; font-size: 0.9em; line-height: 1;">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                    <input type="hidden" name="role_ids[]" value="{% for value, label in update_form.role.field.choices %}{% if label == role %}{{ value }}{% endif %}{% endfor %}">
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="empty-state d-flex align-items-center justify-content-center text-muted" style="font-size: 0.85rem; font-style: italic; height: 100%; min-height: 40px;">
+                  <i class="bi bi-plus-circle-dotted me-2" style="font-size: 1.2em;"></i>
+                  <span>No roles assigned</span>
+                </div>
+              {% endif %}
+            </div>
+            
+            <!-- Add New Role -->
+            <div class="form-floating">
+              <select class="form-select" id="role-selector">
+                <option value="">— Select a Role to Add —</option>
+                {% for value, label in update_form.role.field.choices %}
+                  {% if value %}
+                    <option value="{{ value }}" data-label="{{ label }}">{{ label }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+              <label for="role-selector">Add Role</label>
+            </div>
+            <div class="form-text">Select roles and they will appear as chips above. You can remove roles by clicking the X.</div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-floating mb-3">
+                {{ update_form.username }}
+                <label for="{{ update_form.username.id_for_label }}">{{ update_form.username.label }}*</label>
+              </div>
+              <div class="form-floating mb-3">
+                <input type="email" class="form-control" name="email_address" id="email_address" value="{{ profile.email_address|default:'' }}" placeholder="Email Address" required>
+                <label for="email_address">Email Address*</label>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="form-floating mb-3">
+                <select class="form-select" name="acc_status_id" id="{{ update_form.account_status.id_for_label }}" required>
+                  <option value="">— Select Status —</option>
+                  {% for value, label in update_form.account_status.field.choices %}
+                    {% if value %}
+                      <option value="{{ value }}" {% if profile.account_status == label %}selected{% endif %}>{{ label }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+                <label for="{{ update_form.account_status.id_for_label }}">{{ update_form.account_status.label }}</label>
+              </div>
+
+              <!-- Password (with toggle + generator) -->
+              <div class="form-group mb-3">
+                <div class="d-flex gap-2">
+                  <div class="form-floating flex-grow-1 position-relative">
+                    <input type="password"
+                           class="form-control"
+                           name="password"
+                           id="{{ update_form.password.id_for_label }}"
+                           value="{{ update_form.password.value|default:'' }}"
+                           style="padding-right: 45px;">
+                    <label for="{{ update_form.password.id_for_label }}">{{ update_form.password.label }}</label>
+
+                    <!-- Eye / Eye-slash -->
+                    <button type="button"
+                            class="btn btn-link position-absolute"
+                            id="toggle-password"
+                            style="right: 10px; top: 50%; transform: translateY(-50%); padding: 0; border: none; color: #6c757d;"
+                            title="Toggle Password Visibility"
+                            aria-pressed="false">
+                      <span class="icon-eye">{% bs_icon 'eye' %}</span>
+                      <span class="icon-eye-slash d-none">{% bs_icon 'eye-slash' %}</span>
+                    </button>
+                  </div>
+
+                  <!-- Generate -->
+                  <button type="button"
+                          class="btn btn-reset btn-sm"
+                          id="generate-password"
+                          style="width: 65px;"
+                          title="Generate Password">
+                    {% bs_icon 'arrow-repeat' %}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Purok (BHW only) -->
+          <div class="form-group mb-3 {% if 'Barangay Health Worker' not in profile.role %}d-none{% endif %}" id="purok-field">
+            <label class="form-label small">Assigned Purok/Sitio</label>
+            <div id="purok-list">
+              {% if purok_list and purok_list|length > 0 %}
+                {% for purok in purok_list %}
+                  <div class="purok-row mb-2" data-index="{{ forloop.counter0 }}">
+                    <div class="d-flex gap-2">
+                      <div class="form-floating flex-grow-1">
+                        <select class="form-select" name="purok_ids[]" id="purok_sitio_{{ forloop.counter0 }}">
+                          <option value="">— Select Purok/Sitio —</option>
+                          {% for value, label in update_form.assigned_purok.field.choices %}
+                            {% if value %}
+                              <option value="{{ value }}" {% if purok == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                            {% endif %}
+                          {% endfor %}
+                        </select>
+                        <label for="purok_sitio_{{ forloop.counter0 }}">{% if forloop.first %}Primary{% else %}Additional{% endif %} Purok/Sitio</label>
+                      </div>
+                      <button type="button" class="btn btn-reset btn-sm remove-purok" style="width: 65px;" title="Remove Purok">{% bs_icon 'dash' %}</button>
+                      {% if forloop.first %}
+                        <button type="button" class="btn btn-reset btn-sm" id="add-purok" style="width: 65px;" title="Add Purok">{% bs_icon 'plus' %}</button>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="purok-row mb-2" data-index="0">
+                  <div class="d-flex gap-2">
+                    <div class="form-floating flex-grow-1">
+                      <select class="form-select" name="purok_ids[]" id="purok_sitio_0">
+                        <option value="">— Select Purok/Sitio —</option>
+                        {% for value, label in update_form.assigned_purok.field.choices %}
+                          {% if value %}
+                            <option value="{{ value }}">{{ label }}</option>
+                          {% endif %}
+                        {% endfor %}
+                      </select>
+                      <label for="purok_sitio_0">Primary Purok/Sitio</label>
+                    </div>
+                    <button type="button" class="btn btn-reset btn-sm remove-purok" style="width: 65px;" title="Remove Purok">{% bs_icon 'dash' %}</button>
+                    <button type="button" class="btn btn-reset btn-sm" id="add-purok" style="width: 65px;" title="Add Purok">{% bs_icon 'plus' %}</button>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+            <div class="form-text">Assign purok/sitio for BHW role.</div>
+          </div>
+
+          <!-- Schedule (Lupon Member only) -->
+          <div class="form-group mb-3 {% if 'Barangay Lupon Member' not in profile.role %}d-none{% endif %}" id="schedule-field">
+            <label class="form-label small">Assigned Schedule</label>
+            <div id="schedule-list">
+              {% if schedule_list and schedule_list|length > 0 %}
+                {% for schedule in schedule_list %}
+                  <div class="schedule-row mb-2" data-index="{{ forloop.counter0 }}">
+                    <div class="d-flex gap-2">
+                      <div class="form-floating" style="flex: 1; min-width: 150px;">
+                        <select class="form-select" name="schedule_day[]" id="day_{{ forloop.counter0 }}">
+                          <option value="">— Select Day —</option>
+                          {% for value, label in day_choices %}
+                            <option value="{{ value }}" {% if schedule.day == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                        <label for="day_{{ forloop.counter0 }}">Day</label>
+                      </div>
+                      <div class="form-floating" style="flex: 0 0 130px;">
+                        <input type="time" class="form-control" name="schedule_time_start[]" id="time_start_{{ forloop.counter0 }}" value="{{ schedule.time_start }}">
+                        <label for="time_start_{{ forloop.counter0 }}">Start</label>
+                      </div>
+                      <div class="form-floating" style="flex: 0 0 130px;">
+                        <input type="time" class="form-control" name="schedule_time_end[]" id="time_end_{{ forloop.counter0 }}" value="{{ schedule.time_end }}">
+                        <label for="time_end_{{ forloop.counter0 }}">End</label>
+                      </div>
+                      <button type="button" class="btn btn-reset btn-sm remove-schedule" style="width: 65px; height: 58px;" title="Remove Schedule">{% bs_icon 'dash' %}</button>
+                      {% if forloop.first %}
+                        <button type="button" class="btn btn-reset btn-sm" id="add-schedule" style="width: 65px; height: 58px;" title="Add Schedule">{% bs_icon 'plus' %}</button>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="schedule-row mb-2" data-index="0">
+                  <div class="d-flex gap-2">
+                    <div class="form-floating" style="flex: 1; min-width: 150px;">
+                      <select class="form-select" name="schedule_day[]" id="day_0">
+                        <option value="">— Select Day —</option>
+                        {% for value, label in day_choices %}
+                          <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                      <label for="day_0">Day</label>
+                    </div>
+                    <div class="form-floating" style="flex: 0 0 130px;">
+                      <input type="time" class="form-control" name="schedule_time_start[]" id="time_start_0">
+                      <label for="time_start_0">Start</label>
+                    </div>
+                    <div class="form-floating" style="flex: 0 0 130px;">
+                      <input type="time" class="form-control" name="schedule_time_end[]" id="time_end_0">
+                      <label for="time_end_0">End</label>
+                    </div>
+                    <button type="button" class="btn btn-reset btn-sm remove-schedule" style="width: 65px; height: 58px;" title="Remove Schedule">{% bs_icon 'dash' %}</button>
+                    <button type="button" class="btn btn-reset btn-sm" id="add-schedule" style="width: 65px; height: 58px;" title="Add Schedule">{% bs_icon 'plus' %}</button>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+            <div class="form-text">Set schedule for Lupon Member role.</div>
+          </div>
+          
+          <!-- Reason for Update -->
+          <div class="form-group mb-3">
+            <div class="form-floating">
+              <select class="form-select" id="staff_reason" name="staff_reason">
+                <option value="">Select Reason</option>
+                <option value="Role Change">Role Change</option>
+                <option value="Status Update">Status Update</option>
+                <option value="Credential Update">Credential Update</option>
+                <option value="Assignment Change">Assignment Change</option>
+                <option value="Data Correction">Data Correction</option>
+                <option value="Other">Other</option>
+              </select>
+              <label for="staff_reason">Reason for Update *</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn btn-submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true" style="z-index: 10000;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #ff6b6b, #ee5a52); border-radius: 50%; margin-bottom: 16px;">
+            <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>
+          </div>
+        </div>
+        <h5 class="modal-title fw-semibold mb-2" style="color: #2d3748;">Validation Error</h5>
+        <p id="errorMessage" class="text-muted mb-4" style="line-height: 1.5;"></p>
+        <button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Deactivate Confirmation Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1" style="z-index: 9999;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #ff6b6b, #ee5a52); border-radius: 50%; margin-bottom: 16px;">
+            <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>
+          </div>
+        </div>
+        <h5 class="modal-title fw-semibold mb-2" style="color: #2d3748;">Deactivate Account</h5>
+        <p class="text-muted mb-4" style="line-height: 1.5;">Are you sure you want to deactivate this account? Once deactivated, this account cannot be updated anymore.</p>
+        <div class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-submit px-3 py-2" id="confirmDeactivate">Deactivate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include 'partials/modal_messages.html' %}
+
+<script>
+function toggleRoleFields() {
+  const selectedRoles = Array.from(document.querySelectorAll('input[name="role_ids[]"]')).map(input => {
+    const value = input.value;
+    const option = document.querySelector(`#role-selector option[value="${value}"]`);
+    return option ? option.dataset.label : '';
+  });
+  
+  const purokField = document.getElementById('purok-field');
+  const scheduleField = document.getElementById('schedule-field');
+  
+  const hasBHW = selectedRoles.includes('Barangay Health Worker');
+  const hasLupon = selectedRoles.includes('Barangay Lupon Member');
+  
+  purokField.classList.toggle('d-none', !hasBHW);
+  scheduleField.classList.toggle('d-none', !hasLupon);
+  
+  // Clear purok fields if no BHW role
+  if (!hasBHW) {
+    const purokSelects = document.querySelectorAll('select[name="purok_ids[]"]');
+    purokSelects.forEach(select => select.value = '');
+  }
+  
+  // Clear schedule fields if no Lupon role
+  if (!hasLupon) {
+    const daySelects = document.querySelectorAll('select[name="schedule_day[]"]');
+    const timeStarts = document.querySelectorAll('input[name="schedule_time_start[]"]');
+    const timeEnds = document.querySelectorAll('input[name="schedule_time_end[]"]');
+    
+    daySelects.forEach(select => select.value = '');
+    timeStarts.forEach(input => input.value = '');
+    timeEnds.forEach(input => input.value = '');
+  }
+}
+
+// Role management functions
+function addRole() {
+  const selector = document.getElementById('role-selector');
+  const selectedValue = selector.value;
+  const selectedLabel = selector.options[selector.selectedIndex]?.dataset.label;
+  
+  if (!selectedValue || !selectedLabel) return;
+  
+  // Check if role already exists
+  const existingRoles = Array.from(document.querySelectorAll('input[name="role_ids[]"]')).map(input => input.value);
+  if (existingRoles.includes(selectedValue)) {
+    showErrorModal('This role is already assigned.');
+    selector.value = ''; // Reset selector
+    return;
+  }
+  
+  // Add role chip
+  const container = document.getElementById('selected-roles');
+  const emptyState = container.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+  
+  const chip = document.createElement('div');
+  chip.className = 'role-chip d-flex align-items-center gap-1 px-2 py-1';
+  chip.style.cssText = 'background: var(--bs-danger-text-emphasis); color: white; border-radius: 16px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);';
+  const chipIndex = container.querySelectorAll('.role-chip').length;
+  chip.innerHTML = `
+    <span>${selectedLabel}</span>
+    <button type="button" class="btn p-0 text-white" onclick="removeRoleAt(${chipIndex})" style="background: none; border: none; font-size: 0.9em; line-height: 1;">
+      <i class="bi bi-x-lg"></i>
+    </button>
+    <input type="hidden" name="role_ids[]" value="${selectedValue}">
+  `;
+  
+  container.appendChild(chip);
+  selector.value = '';
+  toggleRoleFields();
+}
+
+// Global remove functions
+window.removeRoleAt = function(index) {
+  const container = document.getElementById('selected-roles');
+  const chips = container.querySelectorAll('.role-chip');
+  if (chips[index]) {
+    chips[index].remove();
+    
+    // Show empty state if no roles left
+    if (!container.querySelector('.role-chip')) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state d-flex align-items-center justify-content-center text-muted';
+      emptyState.style.cssText = 'font-size: 0.85rem; font-style: italic; height: 100%; min-height: 40px;';
+      emptyState.innerHTML = '<i class="bi bi-plus-circle-dotted me-2" style="font-size: 1.2em;"></i><span>No roles assigned</span>';
+      container.appendChild(emptyState);
+    }
+    
+    toggleRoleFields();
+  }
+};
+
+(function() {
+  // Store original HTML content
+  let originalPurokHTML = '';
+  let originalScheduleHTML = '';
+  let originalAccountStatus = '';
+  let originalRolesHTML = '';
+  
+  // Store original values when update modal opens
+  const updateModal = document.getElementById('updateModal');
+  if (updateModal) {
+    updateModal.addEventListener('show.bs.modal', function() {
+      // Store original HTML of purok, schedule lists, and roles
+      const purokList = document.getElementById('purok-list');
+      const scheduleList = document.getElementById('schedule-list');
+      const rolesContainer = document.getElementById('selected-roles');
+      
+      if (purokList) originalPurokHTML = purokList.innerHTML;
+      if (scheduleList) originalScheduleHTML = scheduleList.innerHTML;
+      if (rolesContainer) originalRolesHTML = rolesContainer.innerHTML;
+      
+      // Store original account status
+      const accountStatusSelect = document.getElementById('{{ update_form.account_status.id_for_label }}');
+      if (accountStatusSelect) {
+        originalAccountStatus = accountStatusSelect.value;
+      }
+      
+      // Store original form data for change detection
+      const form = this.querySelector('form');
+      if (form) {
+        const formData = new FormData(form);
+        const filteredData = new FormData();
+        for (let [key, value] of formData.entries()) {
+          if (key !== 'staff_reason' && key !== 'csrfmiddlewaretoken') {
+            filteredData.append(key, value);
+          }
+        }
+        form.dataset.originalData = new URLSearchParams(filteredData).toString();
+      }
+    });
+  }
+  
+  // Store original personal form data when modal opens
+  const personalInfoModal = document.getElementById('updatePersonalInfoModal');
+  if (personalInfoModal) {
+    personalInfoModal.addEventListener('shown.bs.modal', function() {
+      const form = this.querySelector('form');
+      if (form) {
+        setTimeout(() => {
+          const formData = new FormData(form);
+          const filteredData = new FormData();
+          for (let [key, value] of formData.entries()) {
+            if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'action') {
+              filteredData.append(key, value);
+            }
+          }
+          form.dataset.originalData = new URLSearchParams(filteredData).toString();
+        }, 100);
+      }
+    });
+    
+    // Handle cancel/close modal
+    function restoreOriginalState() {
+      const purokList = document.getElementById('purok-list');
+      const scheduleList = document.getElementById('schedule-list');
+      const rolesContainer = document.getElementById('selected-roles');
+      
+      if (purokList && originalPurokHTML) purokList.innerHTML = originalPurokHTML;
+      if (scheduleList && originalScheduleHTML) scheduleList.innerHTML = originalScheduleHTML;
+      if (rolesContainer && originalRolesHTML) rolesContainer.innerHTML = originalRolesHTML;
+      
+      const accountStatusSelect = document.getElementById('{{ update_form.account_status.id_for_label }}');
+      if (accountStatusSelect && originalAccountStatus) {
+        accountStatusSelect.value = originalAccountStatus;
+      }
+      
+      setTimeout(() => toggleRoleFields(), 10);
+    }
+    
+    // Event delegation for cancel buttons
+    document.addEventListener('click', function(e) {
+      if (e.target.matches('#cancelBtn, [data-bs-dismiss="modal"]') && updateModal.contains(e.target)) {
+        restoreOriginalState();
+      }
+    });
+    
+    // Also restore on modal hidden (for ESC key or backdrop click)
+    updateModal.addEventListener('hidden.bs.modal', restoreOriginalState);
+  }
+  
+  // Password toggle
+  const pwd = document.getElementById('{{ update_form.password.id_for_label }}');
+  const toggleBtn = document.getElementById('toggle-password');
+
+  if (pwd && toggleBtn) {
+    const eye      = toggleBtn.querySelector('.icon-eye');
+    const eyeSlash = toggleBtn.querySelector('.icon-eye-slash');
+
+    toggleBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      const makeVisible = (pwd.type === 'password');
+      pwd.type = makeVisible ? 'text' : 'password';
+
+      if (makeVisible) {
+        eye.classList.add('d-none');
+        eyeSlash.classList.remove('d-none');
+        toggleBtn.setAttribute('aria-pressed', 'true');
+      } else {
+        eyeSlash.classList.add('d-none');
+        eye.classList.remove('d-none');
+        toggleBtn.setAttribute('aria-pressed', 'false');
+      }
+
+      // keep caret at end
+      try { const v = pwd.value; pwd.value = ''; pwd.value = v; } catch {}
+      pwd.focus();
+    });
+  }
+
+  // Generate password (ensures upper, lower, number; length 8)
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'generate-password') {
+      if (!pwd) return;
+      const upper='ABCDEFGHIJKLMNOPQRSTUVWXYZ', lower='abcdefghijklmnopqrstuvwxyz', nums='0123456789';
+      const all = upper + lower + nums;
+      let pass = upper[Math.floor(Math.random()*upper.length)]
+               + lower[Math.floor(Math.random()*lower.length)]
+               + nums[Math.floor(Math.random()*nums.length)];
+      for (let i=3;i<8;i++) pass += all[Math.floor(Math.random()*all.length)];
+      pass = pass.split('').sort(()=>Math.random()-0.5).join('');
+
+      pwd.value = pass;
+      // ensure password is hidden after generation
+      if (pwd.type === 'text') {
+        pwd.type = 'password';
+        eye.classList.remove('d-none');
+        eyeSlash.classList.add('d-none');
+        toggleBtn.setAttribute('aria-pressed', 'false');
+      }
+    }
+
+    // Add / Remove Purok rows
+    if (e.target && e.target.id === 'add-purok') {
+      const list = document.getElementById('purok-list');
+      const index = list.children.length;
+      const row = document.createElement('div');
+      row.className = 'purok-row mb-2';
+      row.setAttribute('data-index', index);
+      row.innerHTML = `
+        <div class="d-flex gap-2">
+          <div class="form-floating flex-grow-1">
+            <select class="form-select" name="purok_ids[]" id="purok_sitio_${index}">
+              <option value="">— Select Purok/Sitio —</option>
+              <option value="1">Kanipaan</option>
+              <option value="2">Pampango</option>
+              <option value="3">Lutaw-Lutaw</option>
+              <option value="4">Mauco</option>
+            </select>
+            <label for="purok_sitio_${index}">Additional Purok/Sitio</label>
+          </div>
+          <button type="button" class="btn btn-reset btn-sm remove-purok" style="width: 65px;" title="Remove Purok"><i class="bi bi-dash"></i></button>
+        </div>`;
+      list.appendChild(row);
+    }
+    if (e.target && e.target.classList.contains('remove-purok')) {
+      const purokList = document.getElementById('purok-list');
+      const currentRow = e.target.closest('.purok-row');
+      
+      if (purokList.children.length > 1) {
+        // If more than one row, just remove it
+        currentRow.remove();
+        // Update add button - move to first row if needed
+        const firstRow = purokList.querySelector('.purok-row');
+        if (firstRow && !firstRow.querySelector('#add-purok')) {
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'btn btn-reset btn-sm';
+          addBtn.id = 'add-purok';
+          addBtn.style.width = '65px';
+          addBtn.title = 'Add Purok';
+          addBtn.innerHTML = '<i class="bi bi-plus"></i>';
+          firstRow.querySelector('.d-flex').appendChild(addBtn);
+        }
+      } else {
+        // If only one row, clear it instead of removing
+        const select = currentRow.querySelector('select[name="purok_ids[]"]');
+        
+        if (select) select.value = '';
+      }
+    }
+
+    // Add / Remove Schedule rows
+    if (e.target && e.target.id === 'add-schedule') {
+      const list = document.getElementById('schedule-list');
+      const index = list.children.length;
+      const row = document.createElement('div');
+      row.className = 'schedule-row mb-2';
+      row.setAttribute('data-index', index);
+      row.innerHTML = `
+        <div class="d-flex gap-2">
+          <div class="form-floating" style="flex: 1; min-width: 150px;">
+            <select class="form-select" name="schedule_day[]" id="day_${index}">
+              <option value="">— Select Day —</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+              <option value="7">Sunday</option>
+            </select>
+            <label for="day_${index}">Day</label>
+          </div>
+          <div class="form-floating" style="flex: 0 0 130px;">
+            <input type="time" class="form-control" name="schedule_time_start[]" id="time_start_${index}">
+            <label for="time_start_${index}">Start</label>
+          </div>
+          <div class="form-floating" style="flex: 0 0 130px;">
+            <input type="time" class="form-control" name="schedule_time_end[]" id="time_end_${index}">
+            <label for="time_end_${index}">End</label>
+          </div>
+          <button type="button" class="btn btn-reset btn-sm remove-schedule" style="width: 65px; height: 58px;" title="Remove Schedule"><i class="bi bi-dash"></i></button>
+        </div>`;
+      list.appendChild(row);
+    }
+    if (e.target && e.target.classList.contains('remove-schedule')) {
+      const scheduleList = document.getElementById('schedule-list');
+      const currentRow = e.target.closest('.schedule-row');
+      
+      if (scheduleList.children.length > 1) {
+        // If more than one row, just remove it
+        currentRow.remove();
+        // Update add button - move to first row if needed
+        const firstRow = scheduleList.querySelector('.schedule-row');
+        if (firstRow && !firstRow.querySelector('#add-schedule')) {
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'btn btn-reset btn-sm';
+          addBtn.id = 'add-schedule';
+          addBtn.style.width = '65px';
+          addBtn.style.height = '58px';
+          addBtn.title = 'Add Schedule';
+          addBtn.innerHTML = '<i class="bi bi-plus"></i>';
+          firstRow.querySelector('.d-flex').appendChild(addBtn);
+        }
+      } else {
+        // If only one row, clear it instead of removing
+        const daySelect = currentRow.querySelector('select[name="schedule_day[]"]');
+        const timeStart = currentRow.querySelector('input[name="schedule_time_start[]"]');
+        const timeEnd = currentRow.querySelector('input[name="schedule_time_end[]"]');
+        
+        if (daySelect) daySelect.value = '';
+        if (timeStart) timeStart.value = '';
+        if (timeEnd) timeEnd.value = '';
+      }
+    }
+  });
+
+  // Show error modal
+  function showErrorModal(message) {
+    document.getElementById('errorMessage').textContent = message;
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+  }
+
+  // Validation for duplicate selections
+  function validatePurokSelections() {
+    const purokSelects = document.querySelectorAll('select[name="purok_ids[]"]');
+    const selectedValues = [];
+    let hasDuplicate = false;
+
+    purokSelects.forEach(select => {
+      if (select.value && selectedValues.includes(select.value)) {
+        hasDuplicate = true;
+      } else if (select.value) {
+        selectedValues.push(select.value);
+      }
+    });
+
+    return !hasDuplicate;
+  }
+
+  function validateScheduleSelections() {
+    const daySelects = document.querySelectorAll('select[name="schedule_day[]"]');
+    const selectedDays = [];
+    let hasDuplicate = false;
+
+    daySelects.forEach(select => {
+      if (select.value && selectedDays.includes(select.value)) {
+        hasDuplicate = true;
+      } else if (select.value) {
+        selectedDays.push(select.value);
+      }
+    });
+
+    return !hasDuplicate;
+  }
+
+  // Add change event listeners for validation and auto-add role
+  document.addEventListener('change', function(e) {
+    if (e.target.name && (e.target.name === 'purok_ids[]')) {
+      validatePurokSelections();
+    }
+    if (e.target.name && e.target.name === 'schedule_day[]') {
+      validateScheduleSelections();
+    }
+    // Auto-add role when selected from dropdown
+    if (e.target && e.target.id === 'role-selector') {
+      if (e.target.value) {
+        addRole();
+      }
+    }
+  });
+
+  // Handle clicks on existing role chips (event delegation)
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.remove-role')) {
+      const chip = e.target.closest('.role-chip');
+      if (chip) {
+        chip.remove();
+        
+        // Show empty state if no roles left
+        const container = document.getElementById('selected-roles');
+        if (!container.querySelector('.role-chip')) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'empty-state d-flex align-items-center justify-content-center text-muted';
+          emptyState.style.cssText = 'font-size: 0.85rem; font-style: italic; height: 100%; min-height: 40px;';
+          emptyState.innerHTML = '<i class="bi bi-plus-circle-dotted me-2" style="font-size: 1.2em;"></i><span>No roles assigned</span>';
+          container.appendChild(emptyState);
+        }
+        
+        toggleRoleFields();
+      }
+    }
+  });
+
+  // Account status change validation
+  const accountStatusSelect = document.getElementById('{{ update_form.account_status.id_for_label }}');
+  if (accountStatusSelect) {
+    accountStatusSelect.addEventListener('change', function(e) {
+      const selectedValue = e.target.value;
+      const selectedText = e.target.options[e.target.selectedIndex]?.text || '';
+      const originalStatus = '{{ profile.account_status|default:"" }}';
+      
+      if (selectedText.toLowerCase() === 'deactivated' && originalStatus.toLowerCase() !== 'deactivated') {
+        e.preventDefault();
+        e.target.value = originalAccountStatus || originalStatus; // Reset to original value
+        
+        const deactivateModal = new bootstrap.Modal(document.getElementById('deactivateModal'));
+        deactivateModal.show();
+        
+        // Handle deactivate modal cancel
+        const deactivateCancelBtn = document.querySelector('#deactivateModal button[data-bs-dismiss="modal"]');
+        if (deactivateCancelBtn) {
+          deactivateCancelBtn.onclick = function() {
+            accountStatusSelect.value = originalAccountStatus || originalStatus;
+          };
+        }
+        
+        document.getElementById('confirmDeactivate').onclick = function() {
+          accountStatusSelect.value = selectedValue; // Apply the deactivated value
+          deactivateModal.hide();
+        };
+      }
+    });
+  }
+
+  // Check if form data has changed
+  function hasFormChanged() {
+    const form = document.querySelector('#updateModal form');
+    if (!form) return false;
+    
+    const currentData = new FormData(form);
+    const originalSerialized = form.dataset.originalData || '';
+    
+    // Exclude reason field from comparison
+    const currentFiltered = new FormData();
+    for (let [key, value] of currentData.entries()) {
+      if (key !== 'staff_reason' && key !== 'csrfmiddlewaretoken') {
+        currentFiltered.append(key, value);
+      }
+    }
+    
+    const currentSerialized = new URLSearchParams(currentFiltered).toString();
+    
+    return currentSerialized !== originalSerialized;
+  }
+  
+  // Form submission validation for staff information
+  const form = document.querySelector('#updateModal form');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      console.log('Staff form submission validation triggered');
+      
+      const staffReason = document.getElementById('staff_reason').value.trim();
+      
+      // Check if at least one role is selected
+      const selectedRoles = document.querySelectorAll('input[name="role_ids[]"]');
+      if (selectedRoles.length === 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showErrorModal('Please select at least one role.');
+        return false;
+      }
+      
+      // Check if reason is provided
+      if (!staffReason) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showErrorModal('Please provide a reason for updating staff information.');
+        return false;
+      }
+      
+      // Check if any data has changed
+      if (!hasFormChanged()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showErrorModal('No changes were made to the staff information.');
+        return false;
+      }
+      
+      // Show confirmation modal
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const confirmModal = document.createElement('div');
+      confirmModal.innerHTML = `
+        <div class="modal fade" id="confirmStaffModal" tabindex="-1" style="z-index: 10001;">
+          <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+              <div class="modal-body text-center p-4">
+                <div class="mb-3">
+                  <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #007bff, #0056b3); border-radius: 50%; margin-bottom: 16px;">
+                    <i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>
+                  </div>
+                </div>
+                <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Changes</h5>
+                <p class="text-muted mb-4">Are you sure you want to save these changes to the staff information?</p>
+                <div class="d-flex gap-2 justify-content-center">
+                  <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-submit px-4 py-2" onclick="document.querySelector('#updateModal form').submit();">Yes, Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(confirmModal);
+      new bootstrap.Modal(document.getElementById('confirmStaffModal')).show();
+      
+      const purokValid = validatePurokSelections();
+      const scheduleValid = validateScheduleSelections();
+      
+      console.log('Purok valid:', purokValid, 'Schedule valid:', scheduleValid);
+      
+      if (!purokValid) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showErrorModal('Duplicate Purok/Sitio selections are not allowed.');
+        return false;
+      }
+      
+      if (!scheduleValid) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showErrorModal('Only one schedule is allowed per day for each staff.');
+        return false;
+      }
+    }, true);
+  }
+  
+  // Store original personal form data manually
+  let originalPersonalData = '';
+  
+  // Check if personal form data has changed
+  function hasPersonalFormChanged() {
+    const form = document.querySelector('#updatePersonalInfoModal form');
+    if (!form) return false;
+    
+    // Store original data if not already stored
+    if (!originalPersonalData) {
+      const formData = new FormData(form);
+      const filteredData = new FormData();
+      for (let [key, value] of formData.entries()) {
+        if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'action') {
+          filteredData.append(key, value);
+        }
+      }
+      originalPersonalData = new URLSearchParams(filteredData).toString();
+    }
+    
+    // Get current data
+    const currentData = new FormData(form);
+    const currentFiltered = new FormData();
+    for (let [key, value] of currentData.entries()) {
+      if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'action') {
+        currentFiltered.append(key, value);
+      }
+    }
+    const currentSerialized = new URLSearchParams(currentFiltered).toString();
+    
+    return currentSerialized !== originalPersonalData;
+  }
+  
+  // Form submission validation for personal information
+  document.addEventListener('submit', function(e) {
+    if (e.target && e.target.closest('#updatePersonalInfoModal')) {
+      console.log('Personal form submission validation triggered');
+      
+      const reason = document.getElementById('reason').value.trim();
+      
+      // Check if reason is provided
+      if (!reason) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        showErrorModal('Please provide a reason for updating personal information.');
+        return false;
+      }
+      
+      // Check if any data has changed
+      if (!hasPersonalFormChanged()) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        showErrorModal('No changes were made to the personal information.');
+        return false;
+      }
+      
+      // Show confirmation modal
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const confirmModal = document.createElement('div');
+      confirmModal.innerHTML = `
+        <div class="modal fade" id="confirmPersonalModal" tabindex="-1" style="z-index: 10001;">
+          <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+              <div class="modal-body text-center p-4">
+                <div class="mb-3">
+                  <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #007bff, #0056b3); border-radius: 50%; margin-bottom: 16px;">
+                    <i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>
+                  </div>
+                </div>
+                <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Changes</h5>
+                <p class="text-muted mb-4">Are you sure you want to save these changes to the personal information?</p>
+                <div class="d-flex gap-2 justify-content-center">
+                  <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-submit px-4 py-2" onclick="document.querySelector('#updatePersonalInfoModal form').submit();">Yes, Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(confirmModal);
+      new bootstrap.Modal(document.getElementById('confirmPersonalModal')).show();
+    }
+  }, true);
+  
+  // Additional validation on save button click
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'savePersonalInfoBtn') {
+      const reason = document.getElementById('reason').value.trim();
+      
+      if (!reason) {
+        e.preventDefault();
+        e.stopPropagation();
+        showErrorModal('Please provide a reason for updating personal information.');
+        return false;
+      }
+      
+      if (!hasPersonalFormChanged()) {
+        e.preventDefault();
+        e.stopPropagation();
+        showErrorModal('No changes were made to the personal information.');
+        return false;
+      }
+    }
+  });
+})();
+</script>
+
+<!-- Update Personal Info Modal -->
+{% if profile.residential_status == 'Non Resident' %}
+<div class="modal fade" id="updatePersonalInfoModal" tabindex="-1" aria-labelledby="updatePersonalInfoModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-xl" style="max-width: 1200px; margin: 1.75rem auto; position: relative; top: 50%; transform: translateY(-50%);">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="updatePersonalInfoModalLabel">Update Personal Information</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_personal_info">
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+          <div class="row g-3">
+            <!-- Basic Information -->
+            <div class="col-12"><h6 class="text-muted mb-0">Basic Information</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ profile.first_name|default:'' }}" required>
+                <label for="first_name">First Name *</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="middle_name" name="middle_name" value="{{ profile.middle_name|default:'' }}">
+                <label for="middle_name">Middle Name</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ profile.last_name|default:'' }}" required>
+                <label for="last_name">Last Name *</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="suffix" name="suffix" value="{{ profile.suffix|default:'' }}">
+                <label for="suffix">Suffix</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="date" class="form-control" id="birthdate" name="birthdate" value="{{ profile.date_of_birth|date:'Y-m-d'|default:'' }}" required>
+                <label for="birthdate">Birth Date*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="sex" name="sex_id" required>
+                  <option value="">Select Sex</option>
+                  <option value="1" {% if profile.sex == 'Male' %}selected{% endif %}>Male</option>
+                  <option value="2" {% if profile.sex == 'Female' %}selected{% endif %}>Female</option>
+                </select>
+                <label for="sex">Sex*</label>
+              </div>
+            </div>
+            
+            <!-- Personal Details -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Personal Details</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="civil_status" name="civil_status_id" required>
+                  <option value="">Select Civil Status</option>
+                  <option value="1" {% if profile.civil_status == 'Single' %}selected{% endif %}>Single</option>
+                  <option value="2" {% if profile.civil_status == 'Married' %}selected{% endif %}>Married</option>
+                  <option value="3" {% if profile.civil_status == 'Widowed' %}selected{% endif %}>Widowed</option>
+                  <option value="4" {% if profile.civil_status == 'Separated' %}selected{% endif %}>Separated</option>
+                  <option value="5" {% if profile.civil_status == 'Divorced' %}selected{% endif %}>Divorced</option>
+                </select>
+                <label for="civil_status">Civil Status*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="nationality" name="nationality_id" required>
+                  <option value="">Select Nationality</option>
+                  <option value="7" {% if profile.nationality == 'Filipino' %}selected{% endif %}>Filipino</option>
+                  <option value="1" {% if profile.nationality == 'American' %}selected{% endif %}>American</option>
+                  <option value="2" {% if profile.nationality == 'Australian' %}selected{% endif %}>Australian</option>
+                  <option value="3" {% if profile.nationality == 'Brazilian' %}selected{% endif %}>Brazilian</option>
+                  <option value="4" {% if profile.nationality == 'British' %}selected{% endif %}>British</option>
+                  <option value="5" {% if profile.nationality == 'Canadian' %}selected{% endif %}>Canadian</option>
+                  <option value="6" {% if profile.nationality == 'Chinese' %}selected{% endif %}>Chinese</option>
+                  <option value="8" {% if profile.nationality == 'French' %}selected{% endif %}>French</option>
+                  <option value="9" {% if profile.nationality == 'German' %}selected{% endif %}>German</option>
+                  <option value="10" {% if profile.nationality == 'Indian' %}selected{% endif %}>Indian</option>
+                  <option value="11" {% if profile.nationality == 'Indonesian' %}selected{% endif %}>Indonesian</option>
+                  <option value="12" {% if profile.nationality == 'Italian' %}selected{% endif %}>Italian</option>
+                  <option value="13" {% if profile.nationality == 'Japanese' %}selected{% endif %}>Japanese</option>
+                  <option value="14" {% if profile.nationality == 'Korean' %}selected{% endif %}>Korean</option>
+                  <option value="15" {% if profile.nationality == 'Malaysian' %}selected{% endif %}>Malaysian</option>
+                  <option value="16" {% if profile.nationality == 'Russian' %}selected{% endif %}>Russian</option>
+                  <option value="17" {% if profile.nationality == 'Saudi' %}selected{% endif %}>Saudi</option>
+                  <option value="18" {% if profile.nationality == 'Spanish' %}selected{% endif %}>Spanish</option>
+                  <option value="19" {% if profile.nationality == 'Thai' %}selected{% endif %}>Thai</option>
+                  <option value="20" {% if profile.nationality == 'Vietnamese' %}selected{% endif %}>Vietnamese</option>
+                  <option value="21" {% if profile.nationality == 'Others' %}selected{% endif %}>Others</option>
+                </select>
+                <label for="nationality">Nationality*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="religion" name="religion_id" required>
+                  <option value="">Select Religion</option>
+                  <option value="12" {% if profile.religion == 'Roman Catholic' %}selected{% endif %}>Roman Catholic</option>
+                  <option value="1" {% if profile.religion == 'Agnostic' %}selected{% endif %}>Agnostic</option>
+                  <option value="2" {% if profile.religion == 'Born Again' %}selected{% endif %}>Born Again</option>
+                  <option value="3" {% if profile.religion == 'Buddhist' %}selected{% endif %}>Buddhist</option>
+                  <option value="4" {% if profile.religion == 'Christian' %}selected{% endif %}>Christian</option>
+                  <option value="5" {% if profile.religion == 'Evangelical' %}selected{% endif %}>Evangelical</option>
+                  <option value="6" {% if profile.religion == 'Hindu' %}selected{% endif %}>Hindu</option>
+                  <option value="7" {% if profile.religion == 'Iglesia Ni Cristo' %}selected{% endif %}>Iglesia Ni Cristo</option>
+                  <option value="8" {% if profile.religion == 'Islam' %}selected{% endif %}>Islam</option>
+                  <option value="9" {% if profile.religion == 'Jehovah\'s Witness' %}selected{% endif %}>Jehovah's Witness</option>
+                  <option value="10" {% if profile.religion == 'Orthodox' %}selected{% endif %}>Orthodox</option>
+                  <option value="11" {% if profile.religion == 'Protestant' %}selected{% endif %}>Protestant</option>
+                  <option value="13" {% if profile.religion == 'Seventh-Day Adventist' %}selected{% endif %}>Seventh-Day Adventist</option>
+                  <option value="14" {% if profile.religion == 'Others' %}selected{% endif %}>Others</option>
+                </select>
+                <label for="religion">Religion*</label>
+              </div>
+            </div>
+            
+            <!-- Contact Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Contact Information</h6></div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="tel" class="form-control" id="mobile_number" name="mobile_number" value="{{ profile.mobile_number|default:'' }}" required>
+                <label for="mobile_number">Mobile Number*</label>
+              </div>
+            </div>
+            
+            <!-- Address Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Address Information</h6></div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="street" name="street" value="{% if profile.home_street %}{{ profile.home_street|title }}{% endif %}" required>
+                <label for="street">Street*</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="sitio_purok" name="sitio_purok" value="{% if profile.home_purok %}{{ profile.home_purok|title }}{% endif %}" required>
+                <label for="sitio_purok">Sitio/Purok*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="barangay" name="barangay" value="{% if profile.home_barangay %}{{ profile.home_barangay|title }}{% endif %}" required>
+                <label for="barangay">Barangay*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="city" name="city" value="{% if profile.home_city %}{{ profile.home_city|title }}{% endif %}" required>
+                <label for="city">City*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="province" name="province" value="{% if profile.home_province %}{{ profile.home_province|title }}{% endif %}" required>
+                <label for="province">Province*</label>
+              </div>
+            </div>
+            
+            <!-- Socioeconomic Information -->
+            <!-- <div class="col-12"><h6 class="text-muted mb-0 mt-3">Socioeconomic Information</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="occupation" name="occupation" value="{{ profile.occupation|default:'' }}">
+                <label for="occupation">Occupation</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="monthly_income" name="monthly_income_id">
+                  <option value="">Select Monthly Income</option>
+                  <option value="1">Below ₱5,000</option>
+                  <option value="2">₱5,001 - ₱10,000</option>
+                  <option value="3">₱10,001 - ₱15,000</option>
+                  <option value="4">₱15,001 - ₱20,000</option>
+                  <option value="5">₱20,001 - ₱30,000</option>
+                  <option value="6">₱30,001 - ₱50,000</option>
+                  <option value="7">₱50,001 - ₱75,000</option>
+                  <option value="8">₱75,001 - ₱100,000</option>
+                  <option value="9">Above ₱100,000</option>
+                </select>
+                <label for="monthly_income">Monthly Income</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="education" name="education_id">
+                  <option value="">Select Education Level</option>
+                  <option value="1">No Formal Education</option>
+                  <option value="2">Kinder</option>
+                  <option value="3">Elementary Student</option>
+                  <option value="4">Elementary Undergrad</option>
+                  <option value="5">Elementary Graduate</option>
+                  <option value="6">High School Student</option>
+                  <option value="7">High School Undergrad</option>
+                  <option value="8">High School Graduate</option>
+                  <option value="9">Vocational Course</option>
+                  <option value="10">College Student</option>
+                  <option value="11">College Undergrad</option>
+                  <option value="12">College Graduate</option>
+                  <option value="13">Postgraduate</option>
+                </select>
+                <label for="education">Education Level</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="employment_status" name="employment_status_id">
+                  <option value="">Select Employment Status</option>
+                  <option value="1">Employed</option>
+                  <option value="2">Unemployed</option>
+                  <option value="3">OFW</option>
+                  <option value="4">Student</option>
+                  <option value="5">Retired</option>
+                  <option value="6">Self-Employed</option>
+                  <option value="7">Pensioner</option>
+                  <option value="8">Housewife</option>
+                  <option value="9">Freelancer</option>
+                  <option value="10">Looking For Work</option>
+                  <option value="11">Part-Time</option>
+                  <option value="12">Full-Time</option>
+                  <option value="13">Underemployed</option>
+                  <option value="14">Others</option>
+                </select>
+                <label for="employment_status">Employment Status</label>
+              </div>
+            </div>
+            
+            <!-- Government Programs -->
+            <!-- <div class="col-12"><h6 class="text-muted mb-0 mt-3">Government Programs</h6></div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_4ps" name="government_programs[]" value="1">
+                <label class="form-check-label" for="prog_4ps">4PS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_gsis" name="government_programs[]" value="2">
+                <label class="form-check-label" for="prog_gsis">GSIS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_philhealth" name="government_programs[]" value="3">
+                <label class="form-check-label" for="prog_philhealth">PHILHEALTH</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_pwd" name="government_programs[]" value="4">
+                <label class="form-check-label" for="prog_pwd">PWD</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_senior" name="government_programs[]" value="5">
+                <label class="form-check-label" for="prog_senior">SENIOR CITIZEN</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_sss" name="government_programs[]" value="6">
+                <label class="form-check-label" for="prog_sss">SSS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_none" name="government_programs[]" value="7">
+                <label class="form-check-label" for="prog_none">NONE</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_others" name="government_programs[]" value="8">
+                <label class="form-check-label" for="prog_others">OTHERS</label>
+              </div>
+            </div> -->
+            <div class="col-md-6">
+              <div class="form-floating">
+                <select class="form-select" id="reason" name="reason" required>
+                  <option value="">Select Reason</option>
+                  <option value="Update Profile">Update Personal Information</option>
+                  <option value="Data Correction">Data Correction</option>
+                  <option value="Status Change">Status Change</option>
+                  <option value="Other">Other</option>
+                </select>
+                <label for="reason">Reason for Update*</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit" id="savePersonalInfoBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+{% endif %}
+
+{% endblock %}

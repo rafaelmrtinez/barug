@@ -11,6 +11,58 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
+PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
+STAFF_SYSTEM_ID        =13
+
+DEBUG = True
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
+
+ANDROID_PACKAGE = "host.exp.exponent"
+
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
+
+ABSTRACT_EMAIL_KEY = os.getenv("ABSTRACT_EMAIL_KEY", "")
+
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
+PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
+STAFF_SYSTEM_ID        =13
+
+DEBUG = True
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
+
+ANDROID_PACKAGE = "host.exp.exponent"
+
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
+
+# Email backend (Gmail SMTP)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# The Gmail account / app password
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+# Nice defaults for From header
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+DEFAULT_FROM_NAME  = os.getenv("DEFAULT_FROM_NAME", "Barangay Sto. Niño")
+
+# settings.py
+LUPON_AUTOGEN_MEDX = False  # turn OFF auto creation of MED1/2/3-SETTLED
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,30 +75,64 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+isProduction = os.getenv("PRODUCTION")
+if isProduction != None and isProduction == "True":
+    DEBUG = False
+    ALLOWED_HOSTS = ["barug-development.onrender.com"]
+else:
+    DEBUG = True
 
-ALLOWED_HOSTS = []
-
-
+ALLOWED_HOSTS = ['*']
+CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
+    "doc_ingest.apps.DocIngestConfig",
+    "maternal.apps.MaternalConfig",
+    "child_health.apps.ChildHealthConfig",
+    "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_bootstrap5",
+    "django_bootstrap_icons",
+    'django.contrib.humanize',
+    "authentication",
+    "event_logs",
+    "resident",
+    "bhw",
+    "captain",
+    "clerk",
+    "lupon_mem",
+    "lupon_pres",
+    "secretary",
+    "staff_admin",
+    "superadmin",
+    "treasurer",
+    "midwife",
+    "payments",
+    "notifications",
+    "corsheaders",
+    "common",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.gzip.GZipMiddleware",       # <-- add
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "authentication.middleware.NoCacheMiddleware",
+    "authentication.middleware.AttachProfileMiddleware",  # <— add
+    "authentication.session_timeout_middleware.SessionTimeoutMiddleware",  # <— auto-logout expired sessions
+    "corsheaders.middleware.CorsMiddleware"
 ]
 
 ROOT_URLCONF = "barug.urls"
@@ -54,13 +140,39 @@ ROOT_URLCONF = "barug.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            BASE_DIR / "templates",
+            BASE_DIR / "authentication/templates/authentication",
+            BASE_DIR / "bhw/templates/bhw",
+            BASE_DIR / "captain/templates/captain",
+            BASE_DIR / "clerk/templates/clerk",
+            BASE_DIR / "lupon_mem/templates/lupon_mem",
+            BASE_DIR / "lupon_pres/templates/lupon_pres",
+            BASE_DIR / "resident/templates/resident",
+            BASE_DIR / "secretary/templates/secretary",
+            BASE_DIR / "staff_admin/templates/staff_admin",
+            BASE_DIR / "superadmin/templates/superadmin",
+            BASE_DIR / "treasurer/templates/treasurer",
+            BASE_DIR / "midwife/templates/midwife",
+            BASE_DIR / "maternal/templates/maternal",
+            BASE_DIR / "child_health/templates/child_health",
+            BASE_DIR / "doc_ingest/templates/doc_ingest",
+            BASE_DIR / "event_logs/templates/event_logs",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "authentication.context_processors.auth_context",
+                'django.template.context_processors.media',
+                "lupon_mem.context_processors.lupon_badge_counts",
+                "clerk.context_processors.app_badge_counts",
+                "treasurer.context_processors.queue_counts",
+                "staff_admin.context_processors.staff_admin_badge_counts",
+                "superadmin.context_processors.staff_admin_badge_counts",
+                "secretary.context_processors.secretary_badge_counts",
             ],
         },
     },
@@ -72,10 +184,48 @@ WSGI_APPLICATION = "barug.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": BASE_DIR / "db.sqlite3",
+#     }
+# }
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
+SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
+
+# DB connection tuning (env-driven; safe defaults for local/dev)
+DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "0"))           # 0 = close after each request
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "100"))    # seconds
+DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")                  # adjust for your environment
+SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
+SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET", "business-proofs")
+
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
+        # keep connections short-lived by default to avoid exhausting pooled DB clients
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+        # health checks force Django to verify connection liveness before use
+        "CONN_HEALTH_CHECKS": True,
+        # do not wrap every request in a transaction by default
+        "ATOMIC_REQUESTS": False,
+        "OPTIONS": {
+            # common options for remote/postgres providers (Supabase etc.)
+            "sslmode": DB_SSL_MODE,
+            "connect_timeout": DB_CONNECT_TIMEOUT,
+            # application_name is useful when inspecting pg_stat_activity
+            "application_name": "barug",
+            # add other provider-specific options here if needed
+        },
     }
 }
 
@@ -102,13 +252,151 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,
+#     "handlers": {
+#         "console": {"class": "logging.StreamHandler"},
+#     },
+#     "loggers": {
+#         # our views module (adjust if your file path differs)
+#         "authentication.views": {
+#             "handlers": ["console"],
+#             "level": "DEBUG",          # show everything from DEBUG up
+#             "propagate": False,
+#         },
+#         # optional: DB to see SQL errors clearly
+#         "django.db.backends": {
+#             "handlers": ["console"],
+#             "level": "ERROR",
+#             "propagate": False,
+#         },
+#     },
+# }
+
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "DEBUG" if DEBUG else "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_true": {"()": "django.utils.log.RequireDebugTrue"},
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
+
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} [{levelname}] {name} | {message} (pid:{process:d} tid:{thread:d})",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{levelname}] {message}",
+            "style": "{",
+        },
+        "sql": {
+            "format": "{asctime} [SQL] {duration:.3f}s | {message}",
+            "style": "{",
+        },
+    },
+
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "level": LOG_LEVEL, "formatter": "simple", "filters": ["require_debug_true"]},
+
+        "console_prod": {"class": "logging.StreamHandler", "level": "WARNING", "formatter": "simple", "filters": ["require_debug_false"]},
+
+        "file_all": {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "app.log"),
+            "level": LOG_LEVEL,
+            "formatter": "verbose",
+        },
+        "file_errors": {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "error.log"),
+            "level": "ERROR",
+            "formatter": "verbose",
+        },
+        "file_sql": {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "sql.log"),
+            "level": os.getenv("SQL_LOG_LEVEL", "ERROR"),
+            "formatter": "sql",
+        },
+        "console_db_error": {
+            "class": "logging.StreamHandler",
+            "level": "ERROR",
+            "formatter": "simple",
+        },
+    },
+
+    "loggers": {
+        # our views module (adjust if your file path differs)
+        "authentication.views": {
+            "handlers": ["console", "console_prod"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        # optional: DB to see SQL errors clearly
+        "django.db.backends": {
+            "handlers": ["console_db_error", "file_sql"],
+            "level": os.getenv("SQL_LOG_LEVEL", "ERROR"),
+            "propagate": False,
+        },
+        "": {
+            "handlers": ["file_all", "file_errors", "console", "console_prod"],
+            "level": LOG_LEVEL,
+            "propagate": True,
+        },
+        "django": {
+            "handlers": ["file_all", "file_errors", "console", "console_prod"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["file_errors", "console_db_error"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+# TIME_ZONE = "UTC"
+# USE_I18N = True
+# USE_TZ = True
 
-USE_I18N = True
-
+# --- Timezone (PH) ---
+TIME_ZONE = "Asia/Manila"
 USE_TZ = True
+
+# --- Sessions ---
+SESSION_COOKIE_AGE = 3600                 # 1 minute (TESTING - change back to 60 * 60 * 8 for production)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False   # keep until age unless browser quits (your call)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"           # consider "Strict" if your flows allow
+
+# Only set these True in production:
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+# (Optional) HSTS in production
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "barug-local",
+        "TIMEOUT": 300,  # 5 minutes default
+    }
+}
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Static files (CSS, JavaScript, Images)
@@ -116,7 +404,44 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "authentication/static/authentication"),
+    # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
+    os.path.join(BASE_DIR, "resident/static/resident"),
+    os.path.join(BASE_DIR, "bhw/static/bhw"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "midwife/static/midwife"),
+    os.path.join(BASE_DIR, "maternal/static/maternal"),
+    os.path.join(BASE_DIR, "child_health/static/child_health"),
+    os.path.join(BASE_DIR, "captain/static/captain"),
+    os.path.join(BASE_DIR, "doc_ingest/static/doc_ingest"),
+]
+
+# STATICFILES_DIRS = [
+#     os.path.join(BASE_DIR, "static"),
+#     os.path.join(BASE_DIR, "authentication/static/authentication"),
+#     os.path.join(BASE_DIR, "bhw/static/bhw"),
+#     os.path.join(BASE_DIR, "captain/static/captain"),
+#     os.path.join(BASE_DIR, "clerk/static/clerk"),
+#     os.path.join(BASE_DIR, "lupon_mem/static/lupon_mem"),
+#     os.path.join(BASE_DIR, "lupon_pres/static/lupon_pres"),
+#     os.path.join(BASE_DIR, "resident/static/resident"),
+#     os.path.join(BASE_DIR, "secreatry/static/secretary"),
+#     os.path.join(BASE_DIR, "staff_admin/static/staff_admin"),
+#     os.path.join(BASE_DIR, "treasurer/static/treasurer"),
+# ]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# By practice the API should not server static files in production.
+# Instead, a web server like Nginx or Apache should be used to serve static files
+# However, exceptions can be made especially when deploying on platforms that do not support custom web servers.
+# THIS LINE SHOULD NOT BE REMOVED UNLESS YOU KNOW WHAT YOU ARE DOING
+if not DEBUG:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'

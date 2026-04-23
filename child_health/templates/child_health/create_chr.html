@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mt-5">
+
+{% comment %} {% include "messages.html" %} {% endcomment %}
+
+<link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+
+<h1 class="mb-3">Create Child Health Record</h1>
+
+<form method="post" action="{% url 'child_health:create_child_health_record' %}" id="child-information-form" novalidate>
+{% csrf_token %}
+
+<!-- Identification (read-only) -->
+<div class="card mb-3 card-brand">
+    <div class="card-header">Identification</div>
+    <div class="card-body" id="identification">
+        <div class="row g-3">
+            <div class="col-md-2">
+                {{ form.family_no.label_tag }}
+                {{ form.family_no }}
+            </div>
+            <div class="col-md-2">
+                {{ form.ufc_no.label_tag }}
+                {{ form.ufc_no }}
+            </div>
+            <div class="col-md-4">
+                {{ form.name.label_tag }}
+                {{ form.name }}
+            </div>
+            <div class="col-md-2">
+                {{ form.sex.label_tag }}
+                {{ form.sex }}
+            </div>
+            <div class="col-md-2">
+                {{ form.birth_order.label_tag }}
+                {{ form.birth_order }}
+            </div>
+            <div class="col-md-3">
+                {{ form.date_of_birth.label_tag }}
+                {{ form.date_of_birth }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Place of Delivery -->
+<div class="card mb-3 card-brand">
+    <div class="card-header">Place of Delivery</div>
+    <div class="card-body" id="place-of-delivery">
+        <div class="row g-2">
+            <div class="col-md-12">
+                {{ form.place_of_delivery.label_tag }}
+                {{ form.place_of_delivery }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Parent Information -->
+<div class="card mb-3 card-brand">
+    <div class="card-header">Parent Information</div>
+    <div class="card-body" id="parent-info">
+        <div class="row g-3">
+            <div class="col-md-3">{{ form.mother.label_tag }} {{ form.mother }}</div>
+            <div class="col-md-2">{{ form.mother_age.label_tag }} {{ form.mother_age }}</div>
+            <div class="col-md-3">{{ form.mother_occupation.label_tag }} {{ form.mother_occupation }}</div>
+
+            <div class="col-md-3">{{ form.father.label_tag }} {{ form.father }}</div>
+            <div class="col-md-2">{{ form.father_age.label_tag }} {{ form.father_age }}</div>
+            <div class="col-md-2">{{ form.father_occupation.label_tag }} {{ form.father_occupation }}</div>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-12">{{ form.address.label_tag }} {{ form.address }}</div>
+        </div>
+    </div>
+</div>
+    <!-- Correct hidden ID holders -->
+<input type="hidden" id="child_person_id"  name="child_id">
+{{ form.mother_person_id }}
+<input type="hidden" id="father_person_id" name="father_id">
+<!-- Actions -->
+<div class="section-action d-grid gap-2 d-sm-flex justify-content-end mt-4">
+  <button type="submit" class="btn btn-brand px-4" id="save-btn">
+    <i class="bi bi-save me-1"></i> Save
+  </button>
+  <button type="button" class="btn btn-outline-brand px-4" id="clear-btn">
+    <i class="bi bi-eraser me-1"></i> Clear
+  </button>
+</div>
+</form>
+</div>
+{% block script %}
+{{ block.super }}
+<script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
+<script defer src="{% static 'child_health/js/findPerson.js' %}"></script>
+{% comment %} <script defer src="{% static 'child_health/js/fetchParentBasics.js' %}"></script> {% endcomment %}
+<script defer src="{% static 'child_health/js/fetchChildBasics.js' %}"></script>
+<script src="{% static 'js/toast.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const nameField = document.getElementById('id_name');
+  const form = document.getElementById('child-information-form');
+  const clearBtn = document.getElementById('clear-btn');
+  const saveBtn = document.getElementById('save-btn');
+  let isSubmitting = false;
+
+  // Clear all form fields except CSRF token
+  const clearAllFields = () => {
+    // Clear all visible form inputs except CSRF token
+    form.querySelectorAll('input, select, textarea').forEach(field => {
+      // Skip CSRF token field
+      if (field.name === 'csrfmiddlewaretoken') return;
+      
+      if (field.type === 'checkbox' || field.type === 'radio') {
+        field.checked = false;
+      } else {
+        field.value = '';
+      }
+    });
+    
+    // Clear hidden person IDs
+    const childPersonId = document.getElementById('child_person_id');
+    const motherPersonId = document.getElementById('mother_person_id');
+    const fatherPersonId = document.getElementById('father_person_id');
+    
+    if (childPersonId) childPersonId.value = '';
+    if (motherPersonId) motherPersonId.value = '';
+    if (fatherPersonId) fatherPersonId.value = '';
+  };
+
+  // Listen to name field changes
+  if (nameField) {
+    nameField.addEventListener('input', (e) => {
+      // If name field is completely empty, clear all fields
+      if (e.target.value.trim() === '') {
+        clearAllFields();
+      }
+    });
+  }
+
+  // Clear button functionality
+  if (clearBtn) {
+    clearBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isSubmitting) return; // Prevent action during submission
+      clearAllFields();
+      // Focus back on name field
+      if (nameField) nameField.focus();
+    });
+  }
+
+  // Form submission with button state management
+  if (form && saveBtn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); // Prevent default form submission
+      
+      if (isSubmitting) {
+        return false;
+      }
+
+      // Check form validity
+      if (form.checkValidity && !form.checkValidity()) {
+        form.reportValidity();
+        return false;
+      }
+
+      isSubmitting = true;
+
+      // Disable save button and show loading state
+      saveBtn.disabled = true;
+      const originalHtml = saveBtn.innerHTML;
+      saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+
+      // Disable clear button during submission
+      if (clearBtn) clearBtn.disabled = true;
+
+      try {
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Collect form data
+        const formData = new FormData(form);
+        
+        // Send POST request via fetch
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: formData,
+          credentials: 'same-origin'
+        });
+
+        // Try to parse response as JSON
+        const contentType = response.headers.get('content-type');
+        let data = null;
+        
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        }
+
+        if (response.ok) {
+          // Success - show toast and clear form
+          const successMsg = (data && data.message) || 'Child Health Record created successfully.';
+          if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+            globalThis.CustomToast.show(successMsg, { type: 'success', delay: 4000 });
+          }
+          
+          // Clear form after successful submission
+          setTimeout(() => {
+            clearAllFields();
+            if (nameField) nameField.focus();
+          }, 500);
+        } else {
+          // Server returned an error status
+          let errorMsg = 'Failed to create child health record. Please check the form and try again.';
+          
+          if (data && data.message) {
+            errorMsg = data.message;
+          } else if (!contentType || !contentType.includes('application/json')) {
+            // Server returned HTML instead of JSON, likely a validation error
+            errorMsg = 'Validation error. Please check all required fields are filled correctly.';
+          }
+          
+          if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+            globalThis.CustomToast.show(errorMsg, { type: 'error', delay: 5000 });
+          } else {
+            alert(errorMsg);
+          }
+          
+          console.error('Form submission error:', errorMsg, data);
+        }
+      } catch (err) {
+        console.error('Error submitting form:', err);
+        const errorMsg = 'An unexpected error occurred. Please try again later.';
+        if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+          globalThis.CustomToast.show(errorMsg, { type: 'error', delay: 5000 });
+        } else {
+          alert(errorMsg);
+        }
+      } finally {
+        // Re-enable buttons
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
+        if (clearBtn) clearBtn.disabled = false;
+        isSubmitting = false;
+      }
+    });
+  }
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <h3>Test: Upload Valid ID (OCR ➜ Edge ➜ Storage)</h3>
+
+  <form id="valid-id-form" method="post" action="{% url 'clerk:valid_id_upload' %}" enctype="multipart/form-data" class="mt-3">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Supabase UID</label>
+        <input type="text" name="supabase_uid" class="form-control" placeholder="user-uid-123" required />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">ID Type</label>
+        <select name="id_type" class="form-select" required>
+          {% for val,label in id_types %}
+            <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Strict (block on OCR fail)</label>
+        <select name="strict" class="form-select">
+          <option value="1">Yes (default)</option>
+          <option value="0" selected>No (warn only)</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Front of ID</label>
+        <input type="file" name="front" class="form-control" accept="image/jpeg,image/png" required />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Back of ID</label>
+        <input type="file" name="back" class="form-control" accept="image/jpeg,image/png" required />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Selfie with ID</label>
+        <input type="file" name="selfie" class="form-control" accept="image/jpeg,image/png" required />
+      </div>
+    </div>
+
+    <div class="mt-4 d-flex align-items-center gap-2">
+      <button id="submitBtn" type="submit" class="btn btn-primary">
+        <span class="btn-text">Upload & Verify</span>
+        <span class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+      </button>
+      <a href="{% url 'clerk:valid_id_test' %}" class="btn btn-outline-secondary">Reset</a>
+    </div>
+  </form>
+
+  <p class="text-muted mt-3">This page is for testing only. Remove in production.</p>
+</div>
+
+<!-- Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-labelledby="resultModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resultModalLabel">Verification Result</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div id="resultSummary" class="mb-2"></div>
+        <div id="resultDetails" class="small text-muted"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('valid-id-form');
+  const submitBtn = document.getElementById('submitBtn');
+  const spinner = submitBtn.querySelector('.spinner-border');
+  const btnText = submitBtn.querySelector('.btn-text');
+
+  async function showModal(title, summaryHtml, detailsHtml, variant) {
+    const titleEl = document.getElementById('resultModalLabel');
+    const summaryEl = document.getElementById('resultSummary');
+    const detailsEl = document.getElementById('resultDetails');
+
+    titleEl.textContent = title;
+    summaryEl.innerHTML = summaryHtml;
+    detailsEl.innerHTML = detailsHtml || '';
+
+    // colorize header by variant
+    const header = titleEl.closest('.modal-header');
+    header.classList.remove('bg-success','bg-danger','bg-primary','text-white');
+    if (variant === 'success') header.classList.add('bg-success','text-white');
+    else if (variant === 'error') header.classList.add('bg-danger','text-white');
+    else header.classList.add('bg-primary','text-white');
+
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    modal.show();
+  }
+
+  function setLoading(on) {
+    submitBtn.disabled = on;
+    spinner.classList.toggle('d-none', !on);
+    btnText.textContent = on ? 'Verifying…' : 'Upload & Verify';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const action = form.getAttribute('action');
+      const fd = new FormData(form);
+
+      const resp = await fetch(action, {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'fetch' } // hint for server logs only
+      });
+
+      const text = await resp.text(); // capture raw for debugging
+      let data = null;
+      try { data = JSON.parse(text); } catch (err) {
+        console.error('Non-JSON response:', text);
+        await showModal('Error', '<div class="alert alert-danger">Server returned non-JSON.</div>', '<pre>'+text.replace(/[<>&]/g, s => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[s]))+'</pre>', 'error');
+        setLoading(false);
+        return;
+      }
+
+      console.log('API response:', data);
+
+      if (!resp.ok) {
+        const errMsg = data?.error || 'Request failed';
+        await showModal('Error', `<div class="alert alert-danger mb-0">${errMsg}</div>`, '', 'error');
+        setLoading(false);
+        return;
+      }
+
+      // Expected structure from your view:
+      // { ok, passed, edge_result, uploaded_verify, uploaded_final, rpc_result, ... }
+      const passed = !!data.passed;
+      const edge = data.edge_result || {};
+      const checks = Array.isArray(edge.checks_failed) ? edge.checks_failed : [];
+
+      if (passed) {
+        const up = data.uploaded_final || {};
+        const f = up.front?.public_url || up.front?.signed_url || '(no url)';
+        const b = up.back?.public_url  || up.back?.signed_url  || '(no url)';
+        const s = up.selfie?.public_url|| up.selfie?.signed_url|| '(no url)';
+
+        await showModal(
+          'Verification Passed',
+          `<div class="alert alert-success mb-2">All good! Your ID was verified.</div>
+           <ul class="mb-0">
+             <li><strong>Front:</strong> ${f}</li>
+             <li><strong>Back:</strong> ${b}</li>
+             <li><strong>Selfie:</strong> ${s}</li>
+           </ul>`,
+          `<div class="mt-2">Verification ID: <code>${edge.verification_id || '—'}</code></div>`,
+          'success'
+        );
+      } else {
+        const reasonList = checks.length
+          ? `<ul class="mb-0">${checks.map(c => `<li>${c}</li>`).join('')}</ul>`
+          : '<em>No detailed checks returned.</em>';
+
+        await showModal(
+          'Verification Failed',
+          `<div class="alert alert-danger mb-2">The uploaded ID did not pass verification.</div>
+           <div><strong>Reasons:</strong></div>
+           ${reasonList}`,
+          `<div class="mt-2">Verification ID: <code>${edge.verification_id || '—'}</code></div>`,
+          'error'
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      await showModal('Error', '<div class="alert alert-danger mb-0">Unexpected error. See console.</div>', '', 'error');
+    } finally {
+      setLoading(false);
+    }
+  });
+})();
+</script>
+{% endblock %}

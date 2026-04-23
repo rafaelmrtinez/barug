@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block content %}
+<style>
+  :root { --brand:#7a1212; --brand-700:#4a0a0a; --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa; }
+  .hero{ background:radial-gradient(120% 140% at 0% 0%,var(--brand) 0%,var(--brand-700) 70%); color:#fff; border-radius:16px; padding:18px 20px; margin-top:40px; }
+  .card-soft{ border:0; border-radius:14px; box-shadow:0 10px 24px rgba(16,24,40,.06); background:#fff; }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+  .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
+  .kv{ list-style:none; padding:0; margin:0; }
+  .kv li{ display:flex; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line); }
+  .kv li:last-child{ border-bottom:0; }
+  .label{ color:var(--muted); min-width:180px; }
+  .value{ font-weight:700; color:var(--ink); }
+  .btn-brand{ background:var(--brand); color:#fff; border:0; }
+  .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; }
+</style>
+
+<div class="container">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <a class="btn btn-outline-secondary btn-sm mt-3" href="{% url 'treasurer:closure_list' %}">
+      {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Closures
+    </a>
+  </div>
+
+  <div class="hero d-flex align-items-center gap-3">
+    <div class="me-auto">
+      <div class="fw-bold">Closure — {{ biz.business_name|default:"Business #"|add:item.business_id }}</div>
+      <div class="text-white-50 small">
+        ID: {{ item.closure_payment_request_id }} • Code: {{ item.request_code }} • Business ID: {{ item.business_id }}
+      </div>
+    </div>
+    <span class="badge {{ status_ui.cls }}">{{ status_ui.label }}</span>
+  </div>
+
+  <div class="row g-3 mt-2">
+    <div class="col-lg-8">
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Closure Details</div>
+          <ul class="kv">
+            <li><span class="label">Request Code</span><span class="value">{{ item.request_code|default:"—" }}</span></li>
+            <li><span class="label">Period Type</span><span class="value">{{ item.period_type|default:"—" }}</span></li>
+            <li><span class="label">Period</span><span class="value">{{ item.period_label|default:"—" }}</span></li>
+            <li><span class="label">Base Fee</span><span class="value">{% if item.base_fee_quote_f %}₱{{ item.base_fee_quote_f|floatformat:2 }}{% else %}—{% endif %}</span></li>
+            <li><span class="label">Surcharge</span><span class="value">{% if item.surcharge_quote_f %}₱{{ item.surcharge_quote_f|floatformat:2 }}{% else %}—{% endif %}</span></li>
+            <li><span class="label">Total</span><span class="value">{% if item.total_quote_f %}₱{{ item.total_quote_f|floatformat:2 }}{% else %}—{% endif %}</span></li>
+            <li><span class="label">Quote Generated</span><span class="value">{% if item.quote_generated_at %}{{ item.quote_generated_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Business Snapshot</div>
+          <ul class="kv">
+            <li><span class="label">Business Name</span><span class="value">{{ biz.business_name|default:"—" }}</span></li>
+            <li><span class="label">Address</span><span class="value">{{ biz.business_address|default:"—" }}</span></li>
+            <li><span class="label">Owner</span><span class="value">{{ biz.owner_full_name|default:"—" }}</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card card-soft sticky-top" style="top: 88px;">
+        <div class="card-body">
+          <div class="section-title mb-2"><span class="dot"></span> Take Payment</div>
+
+          {% if payments.latest_or_number %}
+            <div class="mb-3">
+              <div class="fw-semibold">OR: {{ payments.latest_or_number }}</div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
+            </div>
+          {% else %}
+            <div class="text-muted small mb-2">No OR yet</div>
+          {% endif %}
+
+          {% if not payments.latest_or_number %}
+            <form method="post" action="{% url 'treasurer:closure_take_payment' item.closure_payment_request_id %}">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" disabled>
+                  {% for m in methods %}
+                    <option value="{{ m.payment_method_id }}" {% if m.method_name == 'CASH' %}selected{% endif %}>{{ m.method_name }}</option>
+                  {% endfor %}
+                </select>
+                <input type="hidden" name="payment_method_id" value="{{ cash_payment_method_id }}">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Paid On</label>
+                <input class="form-control" type="date" value="{{ today }}" disabled>
+                <input type="hidden" name="paid_on" value="{{ today }}">
+              </div>
+              <button type="submit" class="btn btn-brand w-100">{% bs_icon 'cash-coin' extra_classes='me-2' %}Accept Payment & Close Business</button>
+            </form>
+          {% else %}
+            <div class="alert alert-success">Paid. Business status is set to <strong>CLOSED</strong>.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

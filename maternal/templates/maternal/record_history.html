@@ -1,0 +1,411 @@
+{# templates/midwife/record_detail.html #} 
+{% extends "base.html" %} 
+{% load static %} 
+{% load bootstrap_icons %} 
+{% block css %}
+  <link rel="stylesheet" href="{% static 'maternal/css/record_history.css' %}">
+  <link rel="stylesheet" href="{% static 'maternal/css/health_record_form_extra.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="maternalSidePanel" class="page-wrap record-history" data-mhr-id="{{ mhr_number|default:'' }}">
+  <div class="container py-4 mt-5">
+    <!-- Hero -->
+    <div class="hero mb-4">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <div class="flex-grow-1">
+          <div class="name" id="record_pname">
+            {{ person_name|default:"-" }}
+          </div>
+          <div class="meta small">
+            <input class="d-none" type="hidden" id="person_id" value="{{ person_id|default:'' }}">
+            Total Maternal Records:
+            <strong id="total_mhr">{{ basic_info.total_maternal_records|default:"-" }}</strong>
+            Family Number:
+            <strong id="family_no">{{ basic_info.family_number|default:"-" }}</strong> ·
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <span class="pill">Person is {{ person_status|default:"-" }}</span>
+          {% if request.session.auth.role_name == "barangay health worker" %}
+          <button
+            class="btn btn-hero"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#createMaternalModal"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- MAIN -->
+      <div class="col-lg-8">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">All Maternal Records</h5>
+            <small class="text-muted">Total: {{ all_records|length|default:0 }} | Showing: {{ page_obj.start_index }}-{{ page_obj.end_index }}</small>
+          </div>
+
+          <div class="table-responsive mt-2 position-static">
+            <table class="table table-sm visit-table record-history-table align-middle">
+              <thead>
+                <tr>
+                  <th>MHR #</th>
+                  <th>Start Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if page_obj %}
+                  {% for r in page_obj %}
+                    <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}" data-mhr-id="{{ r.maternal_record_id }}" role="button">
+                      <td>{{ r.maternal_record_id }}</td>
+                      <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
+                      <td>
+                        {% if r.status_name %}
+                          {% if r.status_name|upper == "ONGOING" %}
+                            <span class="status-badge status-ongoing">{{ r.status_name }}</span>
+                          {% elif r.status_name|upper == "INCOMPLETE" %}
+                            <span class="status-badge status-incomplete">{{ r.status_name }}</span>
+                          {% elif r.status_name|upper == "COMPLETE" %}
+                            <span class="status-badge status-complete">{{ r.status_name }}</span>
+                          {% else %}
+                            <span class="status-badge status-incomplete">{{ r.status_name }}</span>
+                          {% endif %}
+                        {% else %}
+                          <span class="status-badge status-incomplete">N/A</span>
+                        {% endif %}
+                      </td>
+                      {% if request.session.auth.role_name == "midwife" %}
+                      <td class="text-end actions-cell">
+                        <div class="dropdown d-inline-block position-static">
+                          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="actionsDropdown{{ r.maternal_record_id }}" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                            Actions
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdown{{ r.maternal_record_id }}">
+                            <li>
+                              <a class="dropdown-item" href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
+                                <i class="bi bi-folder2-open me-2"></i> Open
+                              </a>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-schedule" type="button" data-bs-toggle="modal" data-bs-target="#prenatalScheduleModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-calendar-plus me-2"></i> Prenatal Schedule
+                              </button>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-postpartum" type="button" data-bs-toggle="modal" data-bs-target="#postpartumScheduleModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-clock-history me-2"></i> Postpartum Schedule
+                              </button>
+                            </li>
+                            {% comment %} <li>
+                              <button class="dropdown-item btn-postpartum-followup" type="button" data-bs-toggle="modal" data-bs-target="#postpartumFollowupMidwifeModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-file-earmark-medical me-2"></i> Add Postpartum Follow-up
+                              </button>
+                            </li> {% endcomment %}
+                            <li>
+                              <button class="dropdown-item btn-generate-summary" type="button" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-file-earmark-pdf me-2"></i> Generate PDF Summary
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+                      </td>
+                      {% elif request.session.auth.role_name == "barangay health worker" %}
+                      <td class="actions-cell text-end">
+                        <div class="dropdown d-inline-block position-static">
+                          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="actionsDropdownBHW{{ r.maternal_record_id }}" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                            Actions
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownBHW{{ r.maternal_record_id }}">
+                            <li>
+                              <a class="dropdown-item" href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
+                                <i class="bi bi-folder2-open me-2"></i> Open
+                              </a>
+                            </li>
+                            <li>
+                              <a class="dropdown-item" href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
+                                <i class="bi bi-calendar2-check me-2"></i> Prenatal Follow-up Schedule
+                              </a>
+                            </li>
+                            {% comment %} <li>
+                              <button class="dropdown-item btn-postpartum-visit" type="button" data-bs-toggle="modal" data-bs-target="#postpartumVisitBHWModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-plus-circle me-2"></i> Add Postpartum Visit
+                              </button>
+                            </li> {% endcomment %}
+                            <li>
+                              <button class="dropdown-item btn-postpartum-record" type="button" data-bs-toggle="modal" data-bs-target="#postpartumRecordModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-file-earmark-medical me-2"></i> Add Postpartum Record
+                              </button>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-generate-summary" type="button" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-file-earmark-pdf me-2"></i> Generate PDF Summary
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+                      </td>
+                      {% endif %}
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-4">No records.</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Controls -->
+          {% if page_obj.has_other_pages %}
+          <div class="page-pagination mt-3">
+            {% include 'paginator.html' with page_obj=page_obj %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- SIDE -->
+      <div class="col-lg-4">
+        <!-- Replace previous side cards: schedules first, then trimester summary -->
+        <div id="lmhr_cards_container">
+          {% include 'maternal/partial/visit_schedule_card.html' %}
+
+          <!-- Postpartum Visit Schedule Card -->
+          <div id="postpartum_schedule_card" class="card p-3 mb-3" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">Next Postpartum Visit</h6>
+            </div>
+            <div class="small">
+              <div class="row g-2">
+                <div class="col-6">
+                  <strong>Date:</strong>
+                  <div id="postpartum_sched_date" class="text-muted">-</div>
+                </div>
+                <div class="col-6">
+                  <strong>Time:</strong>
+                  <div id="postpartum_sched_time" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Purpose:</strong>
+                  <div id="postpartum_sched_purpose" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Notes:</strong>
+                  <div id="postpartum_sched_notes" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Created By:</strong>
+                  <div id="postpartum_sched_creator" class="text-muted">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Postpartum Visit History Card -->
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">Postpartum Visit History</h6>
+              <button id="btn_postpartum_visits" type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#postpartumVisitScheduleModal" style="display:none;">View All</button>
+            </div>
+            <div class="small text-muted">
+              Click "View All" to see postpartum visit history
+            </div>
+          </div>
+
+          <!-- Maternal ANC Visit History Card -->
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">ANC Visit History</h6>
+              <button id="btn_maternal_anc_visits" type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#maternalAncVisitHistoryModal" style="display:none;">View All</button>
+            </div>
+            <div class="small text-muted">
+              Click "View All" to see detailed ANC visit records
+            </div>
+          </div>
+
+          <!-- Trimester cards will be rendered here by maternal_side_panel.js -->
+          <div class="card p-3 mb-3">
+            <h6 class="card-title mb-2">Latest Maternal Health Record (Trimester Summary)</h6>
+            <div id="lmhr_cards" class="small">
+              <div class="kpi">Loading…</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+  <!-- Prenatal Scheduling Modal -->
+  <div class="modal fade mhr" id="prenatalScheduleModal" tabindex="-1" aria-labelledby="prenatalScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="prenatalScheduleModalLabel">Schedule Prenatal Visit</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="prenatalScheduleForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="maternal_record_id" id="sched_maternal_record_id" value="" />
+          <div class="modal-body">
+            <!-- Alert container for frontend validation / API errors -->
+            <div id="postpartumFormAlert"></div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="sched_date" class="form-label">Schedule Date</label>
+                <input type="date" class="form-control" id="sched_date" name="schedule_date" required />
+              </div>
+              <div class="col-md-6">
+                <label for="sched_time" class="form-label">Schedule Time</label>
+                <input type="time" class="form-control" id="sched_time" name="schedule_time" required />
+              </div>
+
+              <div class="col-12">
+                <label for="sched_purpose" class="form-label">Purpose of Visit</label>
+                <input type="text" class="form-control" id="sched_purpose" name="purpose" placeholder="e.g. ANC visit, lab follow-up" required />
+              </div>
+
+              <div class="col-12">
+                <label for="sched_notes" class="form-label">Notes</label>
+                <textarea class="form-control" id="sched_notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer sticky-footer">
+            <div>
+              <small class="text-muted">You can edit the schedule later from the appointments list.</small>
+            </div>
+            <div>
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Schedule</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Postpartum Scheduling Modal -->
+  <div class="modal fade mhr" id="postpartumScheduleModal" tabindex="-1" aria-labelledby="postpartumScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="postpartumScheduleModalLabel">Schedule Postpartum Visit</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="postpartumScheduleForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="maternal_record_id" id="post_maternal_record_id" value="" />
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="post_sched_date" class="form-label">Schedule Date</label>
+                <input type="date" class="form-control" id="post_sched_date" name="schedule_date" required />
+              </div>
+              <div class="col-md-6">
+                <label for="post_sched_time" class="form-label">Schedule Time</label>
+                <input type="time" class="form-control" id="post_sched_time" name="schedule_time" required />
+              </div>
+
+              <div class="col-md-6">
+                <label for="post_visit" class="form-label">Visit</label>
+                <input type="text" class="form-control" id="post_visit" name="visit" placeholder="e.g. 6-week check" required />
+              </div>
+
+              <div class="col-md-6">
+                <label for="post_purpose" class="form-label">Purpose</label>
+                <input type="text" class="form-control" id="post_purpose" name="purpose" placeholder="e.g. breastfeeding support" required />
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer sticky-footer">
+            <div>
+              <small class="text-muted">You can edit the schedule later from the appointments list.</small>
+            </div>
+            <div>
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Schedule</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% include 'maternal/partial/postpartum_followup_midwife.html' %}
+  {% include 'maternal/partial/postpartum_visit_bhw.html' %}
+
+  {% if request.session.auth.role_name == "barangay health worker" %}
+    {% include 'maternal/partial/postpartum_record_modal.html' %}
+  {% endif %}
+
+  {% include 'maternal/partial/visit_schedule_history_modal.html' %}
+
+  {% include 'maternal/partial/maternal_anc_visit_history_modal.html' %}
+
+  {% include 'maternal/partial/postpartum_visit_schedule_modal.html' %}
+
+  <!-- Create Maternal Entry Modal -->
+  <div class="modal fade" id="createMaternalModal" tabindex="-1" aria-labelledby="createMaternalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="createMaternalModalLabel">Add Maternal Health Record</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="createMaternalForm" novalidate>
+          {% csrf_token %}
+          <div class="modal-body">
+            <div id="createMaternalAlert"></div>
+            <div class="mb-3">
+              <label for="cm_weight" class="form-label">Weight (kg)</label>
+              <input type="number" step="0.1" min="0" class="form-control" id="cm_weight" name="weight" placeholder="e.g. 60.5" required />
+            </div>
+            <div class="mb-3">
+              <label for="cm_height" class="form-label">Height (cm)</label>
+              <input type="number" step="0.1" min="0" class="form-control" id="cm_height" name="height" placeholder="e.g. 160" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">BMI Status</label>
+              <div>
+                <input type="hidden" id="cm_bmi_status_id" name="bmi_status_id" value="2" />
+                <span id="cm_bmi_status" class="badge bg-secondary">Unknown</span>
+              </div>
+              <div class="form-text">Auto-calculated from weight and height. Low = 1, Normal = 2, High = 3.</div>
+            </div>
+            <input type="hidden" id="cm_person_id" name="person_id" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" id="cm_save" class="btn btn-primary">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% block scripts %}
+  <script defer src="{% static 'maternal/js/record_history.js' %}"></script>
+  <script defer src="{% static 'maternal/js/schedule_form_helpers.js' %}"></script>
+  <script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
+  <script defer src="{% static 'maternal/js/prenatal_schedule_api.js' %}"></script>
+  <script defer src="{% static 'maternal/js/postpartum_schedule_api.js' %}"></script>
+  <script defer src="{% static 'maternal/js/maternal_side_panel.js' %}"></script>
+  <script defer src="{% static 'maternal/js/postpartum_record_api.js' %}"></script>
+  <script defer src="{% static 'maternal/js/generate_pdf_summary.js' %}"></script>
+  <script defer src="{% static 'maternal/js/postpartum_followup_midwife.js' %}"></script>
+  <script defer src="{% static 'maternal/js/postpartum_visit_bhw.js' %}"></script>
+  <script defer src="{% static 'maternal/js/postpartum_modal_wiring.js' %}"></script>
+  <script defer src="{% static 'maternal/js/create_maternal_entry_modal.js' %}"></script>
+  {% endblock %}
+{% endblock %}

@@ -1,0 +1,41 @@
+/* Table */
+
+.table{
+    font-size: 0.9rem;
+}
+
+.table thead {
+    border: 2px solid;
+}
+
+.table-row-height {
+    vertical-align: middle;
+}
+
+.table td:last-child,
+.table th:last-child {
+  white-space: nowrap;
+  width: 1%;           /* shrink to fit */
+  text-align: center;  /* or right if you prefer */
+}
+
+.table tbody td{
+  transition: background-color .15s ease-in-out;
+}
+
+/* Optional: nicer contrast for dark tables */
+.table.table-dark tbody td:hover{
+  background-color: rgba(255,255,255,.08);
+}
+
+.table tbody tr > *{
+  transition: background-color .15s ease-in-out;
+}
+.table tbody tr:hover > *{
+  background-color: #f1f3f5; /* muted gray for the whole row */
+}
+
+/* Dark table variant */
+.table.table-dark tbody tr:hover > *{
+  background-color: rgba(255,255,255,.08);
+}

@@ -1,0 +1,121 @@
+{% load bootstrap5 %}
+{% bootstrap_css %}{% bootstrap_javascript %}
+
+<div class="container py-3">
+  <a href="{% url 'resident:request_history' %}" class="text-decoration-none">&larr; Back</a>
+  <h3 class="fw-bold mt-2 mb-3">Request Details</h3>
+
+  <!-- Header -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-muted small">Request #</div>
+          <div class="fs-5 fw-bold">{{ h.request_code }}</div>
+        </div>
+        <span class="{{ ui.pill }}">{{ ui.label }}</span>
+      </div>
+
+      <hr>
+
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Document</dt>
+        <dd class="col-sm-9">
+          <div class="fw-semibold">{{ h.document_type_name }}</div>
+          <div class="text-muted small">{{ h.purpose_label }}</div>
+        </dd>
+
+        <dt class="col-sm-3">Date Requested</dt>
+        <dd class="col-sm-9">{{ h.created_at }}</dd>
+
+        <dt class="col-sm-3">Amount Due</dt>
+        <dd class="col-sm-9 fw-bold">{{ pretty.amount_due_peso }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Items: tidy, legit layout -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h6 class="fw-bold mb-3">Items</h6>
+
+      {% if lines %}
+        <div class="list-group list-group-flush">
+          {% for l in lines %}
+            <div class="list-group-item px-0">
+              <div class="d-flex justify-content-between">
+                <div class="me-3">
+                  <div class="fw-semibold">{{ l.fee_name }}</div>
+                  <div class="text-muted small">
+                    {{ l.document_type_name }}{% if l.purpose_code %} &middot; {{ l.purpose_code|title }}{% endif %}
+                  </div>
+                  <div class="text-muted small mt-1">
+                    Qty: <span class="me-2">{{ l.quantity }}</span>
+                    Base: <span class="me-2">{{ l.base_amount_p }}</span>
+                    Waived: <span class="me-2">{{ l.waived_amount_p }}</span>
+                    Surcharge: <span>{{ l.surcharge_amount_p }}</span>
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="fw-bold">{{ l.line_total_p }}</div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-muted">No items.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Payments quick summary -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h6 class="fw-bold mb-3">Payments</h6>
+      {% if payments %}
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <div class="border rounded p-2 small text-muted">OR Count</div>
+            <div class="fw-bold">{{ pretty.or_count }}</div>
+          </div>
+          <div class="col-sm-8">
+            <div class="border rounded p-2 small text-muted">Latest OR</div>
+            <div class="fw-bold">{{ pretty.latest_or.or_number }}</div>
+            <div class="text-muted small">{{ pretty.latest_or.created_at }}</div>
+          </div>
+        </div>
+      {% else %}
+        <div class="text-muted">No payments yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h6 class="fw-bold mb-3">Timeline</h6>
+      {% if timeline %}
+        <ul class="list-unstyled">
+          {% for ev in timeline %}
+            <li class="d-flex mb-3">
+              <div class="me-3">
+                <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">
+                  {{ ev.event_label|default:ev.event_type }}
+                </span>
+              </div>
+              <div>
+                <div class="fw-semibold">{{ ev.happened_at }}</div>
+                {% if ev.meta_json %}
+                  <div class="text-muted small">{{ ev.meta_json }}</div>
+                {% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-muted">No events yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>

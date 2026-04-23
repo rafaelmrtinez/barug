@@ -1,0 +1,92 @@
+:root{ --muted:#6c757d; --line:#e9ecef; --pill:#f8f9fa; --pill-hover:#eef1f3; --subcard:#ffffff; }
+
+.divider{height:1px;background:var(--line);margin:.875rem 0 1.25rem}
+.section-title{color:var(--muted);font-weight:600;font-size:.95rem}
+
+/* Key–value rows */
+.kv{display:grid;grid-template-columns:1fr;row-gap:.35rem}
+.kv-item{display:flex;justify-content:space-between;gap:1rem}
+.kv-key{color:var(--muted);min-width:120px}
+.kv-val{text-align:right;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (min-width:768px){ .kv{row-gap:.5rem} }
+
+.control-icon{
+  color:#000000;
+}
+
+/* Carousel container centered, with a max width */
+.doc-carousel{
+  position: relative;
+  margin: 0 auto;          /* center the whole block */
+  max-width: 520px;        /* tweak as needed */
+  padding: 0 2.5rem;       /* space so arrows can sit "outside" */
+}
+
+/* Keep image centered and contained */
+.img-wrap{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 220px;       /* ensures stable height so buttons don't jump */
+  background: #fff;        /* optional: neutral bg */
+  border-radius: 8px;
+}
+
+.doc-img{
+  max-width: 100%;
+  max-height: 300px;       /* adjust to your layout */
+  object-fit: contain;
+}
+
+/* Move controls outside the image area */
+.doc-carousel .doc-control{
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: auto;             /* shrink to icon size */
+  opacity: 1;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.doc-carousel .carousel-control-prev.doc-control{ left: -0.25rem; }
+.doc-carousel .carousel-control-next.doc-control{ right: -0.25rem; }
+
+/* Larger screens: push arrows further out */
+@media (min-width: 768px){
+  .doc-carousel .carousel-control-prev.doc-control{ left: -1.25rem; }
+  .doc-carousel .carousel-control-next.doc-control{ right: -1.25rem; }
+}
+
+/* Remove Bootstrap default control icon background */
+.doc-carousel .carousel-control-prev-icon,
+.doc-carousel .carousel-control-next-icon{
+  display: none;
+}
+
+/* Optional: cursor and hover ease */
+.doc-carousel .doc-control .control-icon{
+  cursor: pointer;
+  transition: transform .12s ease;
+}
+.doc-carousel .doc-control:hover .control-icon{
+  transform: scale(1.05);
+}
+
+/* Image wrapper ensures consistent height */
+.img-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 280px;         /* 🔹 set your desired height */
+  background: #fff;      /* optional: neutral background */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.doc-img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;   /* ensures whole image fits inside */
+}

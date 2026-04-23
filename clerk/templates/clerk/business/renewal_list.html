@@ -1,0 +1,256 @@
+{# renewal_list.html — updated to mirror Business List filter behavior #}
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932; /* primary */
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb; /* soft bg */
+    --brand-050:#fbf6f6; /* very soft bg */
+    --accent:#D4AF37;
+    --ink:#0f172a;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --ring:rgba(109,41,50,.18);
+  }
+
+  /* Status pills (legend + table) */
+  .status-pill{
+    display:inline-flex; align-items:center; gap:.35rem;
+    border-radius:999px; padding:.22rem .6rem;
+    font-weight:600; font-size:.82rem; border:1px solid transparent;
+    cursor:default;
+  }
+  .st-draft{ background:#fff; border-color:#d1d5db; color:#374151; }
+  .st-review{ background:#fff; border-color:#fde68a; color:#92400e; }
+  .st-forpay{ background:#fff; border-color:#fca5a5; color:#991b1b; }
+  .st-paid{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .st-print{ background:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
+  .st-done{ background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+
+  .owner{ color:#374151; }
+  .small-muted{ color:var(--muted); font-size:.82rem; }
+
+  /* Keep filters.css look/feel consistent */
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  /* ─── YES/NO radio styling (sidebar) ─── */
+  .radio-yn{ display:flex; flex-direction:column; gap:.5rem; }
+  .radio-yn .yn{
+    display:flex; align-items:center; gap:.5rem; cursor:pointer; user-select:none;
+    font-weight:600; color:#111827;
+  }
+  .radio-yn .yn input{
+    position:absolute; opacity:0; width:0; height:0; /* keep accessible */
+  }
+  .radio-yn .yn .dot{
+    width:18px; height:18px; border-radius:50%;
+    border:2px solid var(--muted);
+    display:inline-grid; place-items:center;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .radio-yn .yn .dot::after{
+    content:""; width:8px; height:8px; border-radius:50%;
+    background:transparent; transition:background-color .15s ease;
+  }
+  .radio-yn .yn input:checked + .dot{ border-color:var(--brand-700); }
+  .radio-yn .yn input:checked + .dot::after{ background:var(--brand-700); }
+  .radio-yn .yn input:focus-visible + .dot{ box-shadow:0 0 0 3px var(--ring); }
+
+  .validity-pill{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.2rem .6rem; border-radius:999px;
+    font-weight:600; font-size:.9rem; border:1px solid var(--line);
+    background:var(--brand-050); color:var(--ink);
+  }
+  .validity-pill .range{ font-variant-numeric:tabular-nums; letter-spacing:.2px; }
+  .validity-pill.valid { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .validity-pill.expired{ background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+  .validity-pill.none{ background:#f9fafb; border-style:dashed; color:#6b7280; }
+</style>
+{% endblock css %}
+
+{% block content %}
+<div class="container-fluid py-3" style="margin-top: 40px;">
+
+  {# ─── Toolbar: search + filters (mirrors Business List) ─── #}
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+    {# Search box from RenewalFilters.search #}
+    <div class="searchbox">
+      {% bs_icon 'search' extra_classes='bi' %}
+      {{ form.search }}
+    </div>
+
+    {# preserve selected filters when searching #}
+    <input type="hidden" name="clearance_state" value="{{ request.GET.clearance_state|default:'' }}">
+    <input type="hidden" name="active_renewal" value="{{ request.GET.active_renewal|default:'' }}">
+
+    {# Filters button with badge count #}
+    {% with cs=request.GET.clearance_state|yesno:"1,0" ar=request.GET.active_renewal|yesno:"1,0" %}
+      {% with fc=0|add:cs|add:ar %}
+        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filterPanel"
+                aria-controls="filterPanel">
+          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% if fc %}
+            <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+          {% endif %}
+        </button>
+      {% endwith %}
+    {% endwith %}
+  </form>
+
+  {# ─── Active filter chips (same pattern as Business List) ─── #}
+  <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+    {% if request.GET.clearance_state or request.GET.active_renewal %}
+      <span class="text-muted me-1">Active:</span>
+
+      {# Clearance State chip #}
+      {% if request.GET.clearance_state %}
+        {% with label=form.clearance_state|choice_label:request.GET.clearance_state %}
+          <a class="filter-chip"
+             href="?search={{ request.GET.search|urlencode }}{% if request.GET.active_renewal %}&active_renewal={{ request.GET.active_renewal|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+          </a>
+        {% endwith %}
+      {% endif %}
+
+      {# Active Renewal chip (YES/NO) #}
+      {% if request.GET.active_renewal %}
+        {% with label=form.active_renewal|choice_label:request.GET.active_renewal %}
+          <a class="filter-chip"
+             href="?search={{ request.GET.search|urlencode }}{% if request.GET.clearance_state %}&clearance_state={{ request.GET.clearance_state|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+          </a>
+        {% endwith %}
+      {% endif %}
+
+      <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+        {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+      </a>
+    {% else %}
+      <span class="text-muted small">No active filters.</span>
+    {% endif %}
+  </div>
+
+  {# ─── Table ─── #}
+  <div class="row g-3">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" id="renewalTable">
+        <thead>
+          <tr>
+            <th>Business</th>
+            <th>Clearance State</th>
+            <th>Has Active Renewal Request</th>
+            <th>Validity Date</th>
+            <th>Extension</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="results-body">
+          {# server renders initial rows here; ajax replaces just this tbody #}
+          {% include "business/_renewal_rows.html" with rows=page_obj.object_list %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ─── Offcanvas Filters (driven by RenewalFilters fields) ─── #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+       aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <form method="get" id="filterForm">
+        <div class="mb-3">
+          <label class="form-label">Clearance State</label>
+          {{ form.clearance_state }}
+        </div>
+
+        {# Keep current search term while applying filters #}
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <div class="offcanvas-footer">
+          <div class="actions">
+            <a class="btn btn-outline-brand"
+               href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+{# ─── AJAX live search: mirrors Business List implementation ─── #}
+<script>
+(function () {
+  // elements
+  const input  = document.getElementById('search');      // default Django id for form field "search"
+  const tbody  = document.getElementById('results-body');
+  const endpoint = "{% url search_url %}";               // provide in context like in business list
+
+  // read current filter values from the page (match your hidden inputs)
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim()); // backend expects 'q' like business list
+    params.set('tpl', 'rows');                    // ask server to render only rows partial
+
+    const state = document.querySelector('input[name="clearance_state"]')?.value || '';
+    const active = document.querySelector('input[name="active_renewal"]')?.value || '';
+
+    if (state)  params.set('clearance_state', state);
+    if (active) params.set('active_renewal', active);
+
+    return params.toString();
+  }
+
+  // simple debounce
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  if (input && tbody) {
+    // live as the user types (300ms)
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
+
+{% endblock content %}

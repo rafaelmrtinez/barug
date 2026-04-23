@@ -1,0 +1,394 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load bootstrap_icons %}
+{% block css %}
+<style>
+    .household-form-container {
+        --barug-deep: #3a1217;
+        --barug-deeper: #561c24;
+        --barug-tint: #fbf6f6;
+        --barug-ink: #111827;
+        --barug-muted: #6B7280;
+        --barug-line: #E0E3E7;
+    }
+
+    .household-form-container * {
+        box-sizing: border-box;
+    }
+
+    .household-form-container {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .household-form-container h1 {
+        color: var(--barug-deep);
+        margin-bottom: 10px;
+        font-size: 28px;
+        margin-top: 0;
+    }
+
+    .household-form-container .subtitle {
+        color: var(--barug-muted);
+        margin-bottom: 30px;
+        font-size: 14px;
+    }
+
+    .household-form-container .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .household-form-container .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .household-form-container .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .household-form-container label {
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--barug-ink);
+        font-size: 14px;
+    }
+
+    .household-form-container input[type="text"],
+    .household-form-container input[type="number"],
+    .household-form-container select {
+        padding: 12px;
+        border: 2px solid var(--barug-line);
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        background-color: white;
+    }
+
+    .household-form-container input[type="text"]:focus,
+    .household-form-container input[type="number"]:focus,
+    .household-form-container select:focus {
+        outline: none;
+        border-color: var(--barug-deep);
+        box-shadow: 0 0 0 3px rgba(58, 18, 23, 0.1);
+    }
+
+    .household-form-container select {
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23111827' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 36px;
+    }
+
+    .household-form-container .search-container {
+        position: relative;
+    }
+
+    .household-form-container .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 2px solid var(--barug-line);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .household-form-container .search-results.active {
+        display: block;
+    }
+
+    .household-form-container .search-result-item {
+        padding: 12px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--barug-line);
+        transition: background-color 0.2s ease;
+    }
+
+    .household-form-container .search-result-item:hover {
+        background-color: var(--barug-tint);
+    }
+
+    .household-form-container .search-result-item:last-child {
+        border-bottom: none;
+    }
+
+    .household-form-container .resident-name {
+        font-weight: 600;
+        color: var(--barug-ink);
+    }
+
+    .household-form-container .resident-id {
+        font-size: 12px;
+        color: var(--barug-muted);
+        margin-top: 2px;
+    }
+
+    .household-form-container .selected-resident {
+        margin-top: 10px;
+        padding: 12px;
+        background-color: var(--barug-tint);
+        border-radius: 8px;
+        border-left: 4px solid var(--barug-deep);
+    }
+
+    .household-form-container .selected-resident-label {
+        font-size: 12px;
+        color: var(--barug-muted);
+        margin-bottom: 4px;
+    }
+
+    .household-form-container .selected-resident-info {
+        font-weight: 600;
+        color: var(--barug-ink);
+    }
+
+    .household-form-container .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+    }
+
+    .household-form-container button {
+        flex: 1;
+        padding: 14px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .household-form-container .btn-primary {
+        background-color: var(--barug-deep);
+        color: white;
+    }
+
+    .household-form-container .btn-primary:hover {
+        background-color: var(--barug-deeper);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(58, 18, 23, 0.2);
+    }
+
+    .household-form-container .btn-secondary {
+        background-color: white;
+        color: var(--barug-deep);
+        border: 2px solid var(--barug-deep);
+    }
+
+    .household-form-container .btn-secondary:hover {
+        background-color: var(--barug-tint);
+    }
+
+    @media (max-width: 768px) {
+        .household-form-container {
+            padding: 20px;
+        }
+
+        .household-form-container .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .household-form-container h1 {
+            font-size: 24px;
+        }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="household-form-container mt-3">
+    <h1>Household Registration</h1>
+    <p class="subtitle">Complete the form below to register a new household</p>
+
+    <form id="householdForm">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="houseType">House Type *</label>
+                <select id="houseType" name="houseType" required>
+                    <option value="">Select house type</option>
+                    <option value="1">Nuclear Family</option>
+                    <option value="2">Extended Family</option>
+                    <option value="3">Boarding House</option>
+                    <option value="4">Shared Apartment</option>
+                    <option value="5">Solo Household</option>
+                    <option value="6">Government Housing</option>
+                    <option value="7">Informal Settler</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="houseOwnership">House Ownership *</label>
+                <select id="houseOwnership" name="houseOwnership" required>
+                    <option value="">Select ownership type</option>
+                    <option value="1">Owned</option>
+                    <option value="2">Rented</option>
+                    <option value="3">Family-Owned</option>
+                    <option value="4">Government Housing</option>
+                    <option value="5">Informal Settler</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="city">City *</label>
+                <input type="text" id="city" name="city" placeholder="Enter city" required>
+            </div>
+
+            <div class="form-group">
+                <label for="barangay">Barangay *</label>
+                <input type="text" id="barangay" name="barangay" placeholder="Enter barangay" required>
+            </div>
+
+            <div class="form-group">
+                <label for="sitio">Sitio</label>
+                <input type="text" id="sitio" name="sitio" placeholder="Enter sitio">
+            </div>
+
+            <div class="form-group">
+                <label for="street">Street *</label>
+                <input type="text" id="street" name="street" placeholder="Enter street name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="householdNumber">Household Number *</label>
+                <input type="text" id="householdNumber" name="householdNumber" placeholder="e.g., HH-001" required>
+            </div>
+
+            <div class="form-group">
+                <label for="houseNumber">House Number *</label>
+                <input type="text" id="houseNumber" name="houseNumber" placeholder="Enter house number" required>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="householdHeadSearch">Household Head *</label>
+                <div class="search-container">
+                    <input type="text" id="householdHeadSearch" placeholder="Search for household head..." autocomplete="off">
+                    <div id="searchResults" class="search-results"></div>
+                </div>
+                <input type="hidden" id="householdHeadId" name="householdHeadId" required>
+                <input type="hidden" id="householdHeadName" name="householdHeadName" required>
+                <div id="selectedResident" class="selected-resident" style="display: none;">
+                    <div class="selected-resident-label">Selected Household Head:</div>
+                    <div class="selected-resident-info" id="selectedResidentInfo"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button type="button" class="btn-secondary" onclick="resetHouseholdForm()">Reset</button>
+            <button type="submit" class="btn-primary">Submit Registration</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    (function() {
+        const mockResidents = [
+            { id: 'RES-001', name: 'Juan Dela Cruz' },
+            { id: 'RES-002', name: 'Maria Santos' },
+            { id: 'RES-003', name: 'Pedro Reyes' },
+            { id: 'RES-004', name: 'Ana Garcia' },
+            { id: 'RES-005', name: 'Jose Hernandez' },
+            { id: 'RES-006', name: 'Carmen Lopez' },
+            { id: 'RES-007', name: 'Miguel Torres' },
+            { id: 'RES-008', name: 'Sofia Morales' }
+        ];
+
+        const searchInput = document.getElementById('householdHeadSearch');
+        const searchResults = document.getElementById('searchResults');
+        const selectedResidentDiv = document.getElementById('selectedResident');
+        const selectedResidentInfo = document.getElementById('selectedResidentInfo');
+        const householdHeadId = document.getElementById('householdHeadId');
+        const householdHeadName = document.getElementById('householdHeadName');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            if (query.length === 0) {
+                searchResults.classList.remove('active');
+                return;
+            }
+
+            const filtered = mockResidents.filter(resident => 
+                resident.name.toLowerCase().includes(query) || 
+                resident.id.toLowerCase().includes(query)
+            );
+
+            if (filtered.length > 0) {
+                searchResults.innerHTML = filtered.map(resident => `
+                    <div class="search-result-item" onclick="selectHouseholdResident('${resident.id}', '${resident.name}')">
+                        <div class="resident-name">${resident.name}</div>
+                        <div class="resident-id">ID: ${resident.id}</div>
+                    </div>
+                `).join('');
+                searchResults.classList.add('active');
+            } else {
+                searchResults.innerHTML = '<div class="search-result-item">No residents found</div>';
+                searchResults.classList.add('active');
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.classList.remove('active');
+            }
+        });
+
+        window.selectHouseholdResident = function(id, name) {
+            householdHeadId.value = id;
+            householdHeadName.value = name;
+            searchInput.value = name;
+            selectedResidentInfo.textContent = `${name} (ID: ${id})`;
+            selectedResidentDiv.style.display = 'block';
+            searchResults.classList.remove('active');
+        };
+
+        window.resetHouseholdForm = function() {
+            document.getElementById('householdForm').reset();
+            householdHeadId.value = '';
+            householdHeadName.value = '';
+            selectedResidentDiv.style.display = 'none';
+            searchResults.classList.remove('active');
+        };
+
+        document.getElementById('householdForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (!householdHeadId.value) {
+                alert('Please select a household head from the search results.');
+                return;
+            }
+
+            const formData = {
+                houseType: document.getElementById('houseType').value,
+                houseOwnership: document.getElementById('houseOwnership').value,
+                city: document.getElementById('city').value,
+                barangay: document.getElementById('barangay').value,
+                sitio: document.getElementById('sitio').value,
+                street: document.getElementById('street').value,
+                householdNumber: document.getElementById('householdNumber').value,
+                houseNumber: document.getElementById('houseNumber').value,
+                householdHeadId: householdHeadId.value,
+                householdHeadName: householdHeadName.value
+            };
+
+            console.log('Form submitted:', formData);
+            alert('Household registration submitted successfully!\n\nCheck console for form data.');
+        });
+    })();
+</script>
+{% endblock %}

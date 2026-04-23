@@ -1,0 +1,86 @@
+{% extends "base.html" %} 
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/mhr-theme.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mt-5">
+    <h1 class="mb-3">Maternal Health Record</h1>
+    {% include 'messages.html' %}
+
+    <form id="maternal-form" method="post" action="{% url 'maternal:create_maternal_entry' %}" novalidate>
+        {% csrf_token %}
+        {{ identification_form.person_id }}
+        {{ identification_form.husband_id }}
+
+        <!-- Identification Card -->
+        <div class="card mb-3 card-brand">
+            <div class="card-header">Identification</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        {{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-danger mx-1">*</small>
+                        {{ identification_form.name.label_tag }} {{ identification_form.name }}
+                        <small><small class="text-muted">NOTE: Use this field to search for the mother by name</small></small>
+                    </div>
+                    <div class="col-md-3">{{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}</div>
+                    <div class="col-md-2">{{ identification_form.age.label_tag }} {{ identification_form.age }}</div>
+                    <div class="col-md-2">{{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}</div>
+                    <div class="col-md-8">{{ identification_form.address.label_tag }} {{ identification_form.address }}</div>
+                    <div class="col-md-4">{{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}</div>
+                    <div class="col-md-4">{{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}</div>
+                    <div class="col-md-2">
+                        <small class="text-danger mx-1">*</small>{{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
+                        {% if identification_form.weight_kg.errors %}
+                        <div class="invalid-feedback">
+                            {% for error in identification_form.weight_kg.errors %}
+                            <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-2">
+                        <small class="text-danger mx-1">*</small>{{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
+                        <div id="height-feet" class="mt-1 text-muted">Feet: --</div>
+                        {% if identification_form.height_cm.errors %}
+                        <div class="invalid-feedback">
+                            {% for error in identification_form.height_cm.errors %}
+                            <small class="text-danger">{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}</div>
+                    <div class="col-md-2">{{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}</div>
+                    <div class="col-md-4 gap-2 d-flex align-items-center">{{ identification_form.is_transferred.label_tag }} {{ identification_form.is_transferred }}</div>
+                    <!-- Results container -->
+                    <div class="col-12">
+                        <div id="resident-results" class="mt-2"></div>
+                    </div>
+                </div>
+                    
+                <!-- Footer buttons -->
+                <div class="card-footer d-flex justify-content-end gap-2">
+                    <button type="reset" class="btn btn-outline-brand">Clear</button>
+                    <button type="submit" class="btn btn-brand">Submit</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block js %}
+{{ block.super }}
+<script src="{% static 'maternal/js/findPerson.js' %}"></script>
+<script src="{% static 'maternal/js/maternalBasicInfo.js' %}"></script>
+<script src="{% static 'maternal/js/bmiCalculator.js' %}"></script>
+<script src="{% static 'maternal/js/formClearHandler.js' %}"></script>
+<script src="{% static 'maternal/js/heightConversion.js' %}"></script>
+<script src="{% static 'maternal/js/clearMotherNameField.js' %}"></script>
+{% endblock %}

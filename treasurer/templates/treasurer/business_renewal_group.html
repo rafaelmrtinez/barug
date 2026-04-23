@@ -1,0 +1,213 @@
+{# templates/treasurer/business_renewal_group.html #}
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --gold:#d4af37; --ink:#0f172a; --muted:#667085; --line:#e5e7eb; --bg:#fbf6f6; --card:#ffffff; --cap:#f6f7f9;
+    --ok:#0f5132; --ok-bg:#e8f7ef; --ok-br:#cce7da; --danger:#842029; --danger-bg:#fdeaea; --danger-br:#f5c2c7;
+  }
+  body{ background:var(--bg); }
+  .container-narrow{ width:min(1100px,100%); margin:0 auto; }
+
+  .btn-brand{ background:var(--brand-700); color:#fff; border-color:var(--brand-700); }
+  .btn-brand:hover{ filter:brightness(.96); color:#fff; }
+  .btn-subtle{ background:#fff; border:1px solid var(--line); }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 1px 0 rgba(16,24,40,.05); padding:18px; }
+  .section{ border:1px solid var(--line); border-left:4px solid var(--brand-700); border-radius:12px; background:#fff; padding:14px 14px 12px; }
+  .cap{ display:flex; align-items:center; gap:.6rem; background:var(--cap); border-radius:10px; padding:.5rem .75rem; margin:-.25rem -.25rem .75rem; border:1px solid #eef1f4; }
+  .cap .icon{ width:28px; height:28px; border-radius:999px; display:grid; place-items:center; background:#eef1f3; font-size:.98rem; }
+  .title{ font-weight:800; letter-spacing:.02em; }
+  .grid{ display:grid; grid-template-columns: 1fr 340px; gap:18px; }
+  @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+
+  .pill{ display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .55rem; border-radius:999px; font-size:.73rem; font-weight:900; border:1px solid var(--line); }
+  .pill-ok{ background:var(--ok-bg); color:var(--ok); border-color:var(--ok-br); }
+  .pill-danger{ background:var(--danger-bg); color:var(--danger); border-color:var(--danger-br); }
+  .table-wrap{ overflow:auto; border:1px solid var(--line); border-radius:12px; }
+  .table thead th{ position:sticky; top:0; background:#fafafa; z-index:1; }
+
+  .kv{ display:grid; grid-template-columns: 1fr auto; gap:.35rem .75rem; }
+  .kv .label{ color:var(--muted); }
+  .kv .value{ font-weight:900; }
+  .divider{ height:1px; background:var(--line); margin:10px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-narrow py-3" style="margin-top: 40px;">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:business_renewal' %}">
+      {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Renewals
+    </a>
+    <div class="text-end">
+      <div class="fw-bold">{{ biz.business_name|default:"Business" }}</div>
+      <div class="text-muted small">Business ID:
+        <span class="badge bg-light text-dark border">{{ business_id|stringformat:"06d" }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- MAIN -->
+    <main class="panel">
+      <!-- Breakdown (Preview) — UNPAID ITEMS -->
+      <section class="section mb-3">
+        <div class="cap"><div class="icon">📋</div><div class="title">Breakdown (Preview) — Unpaid</div></div>
+        <div class="table-wrap">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:90px;">Year</th>
+                <th style="width:120px;">Kind</th>
+                <th>Period</th>
+                <th class="text-end">Base Fee</th>
+                <th class="text-end">Offense #</th>
+                <th class="text-end">Surcharge</th>
+                <th class="text-end">Line Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in quote_rows %}
+                <tr>
+                  <td>{{ r.item_year }}</td>
+                  <td>
+                    {% if r.kind == 'ARREARS' %}
+                      <span class="pill pill-danger">ARREARS</span>
+                    {% else %}
+                      <span class="pill pill-ok">CURRENT</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ r.period_label|default:"—" }}</td>
+                  <td class="text-end">₱ {{ r.base_fee|floatformat:2 }}</td>
+                  <td class="text-end">{{ r.offense_no|default:"—" }}</td>
+                  <td class="text-end">₱ {{ r.surcharge|floatformat:2 }}</td>
+                  <td class="text-end"><strong>₱ {{ r.total|floatformat:2 }}</strong></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7" class="text-center text-muted">No unpaid items.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="table-light">
+                <th colspan="5" class="text-end">Grand Total</th>
+                <th class="text-end"><strong>₱ {{ surch_sum|add:base_sum|floatformat:2 }}</strong></th>
+                <th class="text-end"><strong>₱ {{ grand_total|floatformat:2 }}</strong></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="text-muted small mt-2">Auto-computed from database (unpaid items only).</div>
+      </section>
+
+      <!-- Paid history -->
+      <section class="section">
+        <div class="cap"><div class="icon">🧾</div><div class="title">Paid History</div></div>
+        <div class="table-wrap" style="max-height:260px;">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:90px;">Year</th>
+                <th>Period</th>
+                <th>OR Number</th>
+                <th>Paid On</th>
+                <th class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in paid_rows %}
+                <tr>
+                  <td>{{ p.period_year }}</td>
+                  <td>{{ p.period_label|default:"—" }}</td>
+                  <td>{{ p.or_number|default:"—" }}</td>
+                  <td>{{ p.paid_on_disp|default:"—" }}</td>
+                  <td class="text-end">₱ {{ p.total_paid|floatformat:2 }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-center text-muted">No paid records.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- SIDEBAR: Pay All Unpaid Years -->
+    <aside class="panel">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="fw-bold">Pay All Unpaid Years</div>
+      </div>
+
+      <div class="text-muted small mb-2">
+        Creates/uses renewal requests for all unpaid years up to the year you set below, then accepts a single bulk payment.
+      </div>
+
+      <form method="post" action="{% url 'treasurer:business_renewal_take_payment_all' business_id %}">
+        {% csrf_token %}
+
+        <!-- Period type -->
+        <div class="mb-2">
+          <label class="form-label">Period Type</label>
+          <div class="d-flex gap-3">
+            <label class="form-check-label">
+              <input class="form-check-input" type="radio" name="period_type"
+                     value="ANNUAL" {% if default_period_type != 'QUARTERLY' %}checked{% endif %}>
+              ANNUAL
+            </label>
+            <label class="form-check-label">
+              <input class="form-check-input" type="radio" name="period_type"
+                     value="QUARTERLY" {% if default_period_type == 'QUARTERLY' %}checked{% endif %}>
+              QUARTERLY
+            </label>
+          </div>
+          <div class="form-text">For QUARTERLY, arrears are created/paid by quarter.</div>
+        </div>
+
+        <!-- Pay all unpaid up to YEAR -->
+        <div class="mb-2">
+          <label class="form-label">Pay up to Year (inclusive)</label>
+          <input class="form-control" name="period_year" type="number"
+                 value="{{ default_year }}" min="2000" max="2100" required>
+        </div>
+
+        <!-- Optional Paid On -->
+        <div class="mb-2">
+          <label class="form-label">Paid On (optional)</label>
+          <input class="form-control" name="paid_on" type="date" value="">
+        </div>
+
+        <!-- Payment Method -->
+        <div class="mb-3">
+          <label class="form-label">Payment Method</label>
+          <select class="form-select" name="payment_method_id" required>
+            {% for m in methods %}
+              <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-brand w-100 py-2">
+          {% bs_icon 'calendar-check' extra_classes='me-2' %}Pay All Unpaid Years
+        </button>
+      </form>
+
+      <div class="divider"></div>
+      <div class="kv">
+        <div class="label">Preview Total (Unpaid)</div>
+        <div class="value">₱ {{ grand_total|floatformat:2 }}</div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

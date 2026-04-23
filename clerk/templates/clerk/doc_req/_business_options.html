@@ -1,0 +1,27 @@
+{% comment %}
+Expects context:
+  businesses: [
+    {
+      business_id,
+      business_name,
+      business_category_id,
+      address: { street, barangay, city }
+    }, ...
+  ]
+{% endcomment %}
+
+<option value="">— choose business —</option>
+{% for b in businesses %}
+  {% with addr=b.address %}
+  <option
+    value="{{ b.business_id }}"
+    data-bcat="{{ b.business_category_id }}"
+  >
+    {{ b.business_name }}{% if addr %}
+      — {{ addr.street|default_if_none:'' }}{% if addr.barangay %}, {{ addr.barangay }}{% endif %}{% if addr.city %}, {{ addr.city }}{% endif %}
+    {% endif %}
+  </option>
+  {% endwith %}
+{% empty %}
+  <option value="">— no businesses found for this owner —</option>
+{% endfor %}

@@ -1,0 +1,59 @@
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+    <div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-lg-0">
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'captain:dashboard' %}">Dashboard</a>
+                </li>
+
+                <!-- Records Dropdown -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="recordsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Records
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="recordsDropdown">
+                        <li><h6 class="dropdown-header">Household</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:household_list' %}"><i class="bi bi-house-door me-2"></i>Household Records</a></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:household_map' %}"><i class="bi bi-geo-alt me-2"></i>Household Map View</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Family</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:family_list' %}"><i class="bi bi-people me-2"></i>Family Records</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Residents</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:resident_list' %}"><i class="bi bi-person me-2"></i>Resident Records</a></li>
+                        <!-- <li><a class="dropdown-item" href="{% url 'captain:resident_map' %}"><i class="bi bi-geo-alt me-2"></i>Resident Map View</a></li> -->
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Business</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:business_list' %}"><i class="bi bi-building me-2"></i>Business Records</a></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:business_map' %}"><i class="bi bi-pin-map me-2"></i>Business Map View</a></li>
+                    </ul>
+                </li>
+
+                <!-- Staff Directory -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="staffDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Staff Directory
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="staffDropdown">
+                        <li><a class="dropdown-item" href="{% url 'captain:staff_list' %}"><i class="bi bi-people me-2"></i>Staff List</a></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:staff_account_requests_list' %}"><i class="bi bi-inbox me-2"></i>Account Requests</a></li>
+                        <li><a class="dropdown-item" href="{% url 'captain:staff_selection' %}"><i class="bi bi-person-plus me-2"></i>Create Staff Account</a></li>
+                    </ul>
+                </li>
+
+                <!-- Financial Reports -->
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'captain:financial_report' %}">Financial Report</a>
+                </li>
+
+                <!-- Incident Heatmap -->
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'captain:incident_heatmap' %}">Incident Heatmap</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>

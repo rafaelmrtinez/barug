@@ -16,8 +16,36 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from authentication import views as auth_view
+from django.conf import settings
+from django.conf.urls.static import static
+from process_scheduled_deliveries_endpoint import process_scheduled_deliveries
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("", auth_view.login, name="login"),
+    path("admin/", include("staff_admin.urls", namespace="staff_admin")),
+    path("superadmin/", include("superadmin.urls", namespace="superadmin")),
+    path("authentication/", include("authentication.urls", namespace="authentication")),
+    path("bhw/", include("bhw.urls", namespace="bhw")),
+    path("midwife/", include("midwife.urls", namespace="midwife")),
+    path("captain/", include("captain.urls", namespace="captain")),
+    path("clerk/", include("clerk.urls", namespace="clerk")),
+    path("lupon_mem/", include("lupon_mem.urls", namespace="lupon_mem")),
+    path("lupon_pres/", include("lupon_pres.urls", namespace="lupon_pres")),
+    path("person/", include("resident.urls", namespace="resident21")),
+    path("secretary/", include("secretary.urls", namespace="secretary")),
+    path("treasurer/", include("treasurer.urls", namespace="treasurer")),
+    path("resident/", include("resident.urls", namespace="resident")),
+    path("metrics/", include("metrics.urls", namespace="metrics")),
+    path("payments/", include("payments.urls", namespace="payments")),
+    path("notifications/", include("notifications.urls", namespace="notifications")),
+    path("maternal/", include("maternal.urls", namespace="maternal")),
+    path("child-health/", include("child_health.urls", namespace="child_health")),
+    path("docs/", include("doc_ingest.urls", namespace="doc_ingest")),
+    path("e/", include("event_logs.urls", namespace="event_logs")),
+    path('process-scheduled-deliveries/', process_scheduled_deliveries, name='process_scheduled_deliveries'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

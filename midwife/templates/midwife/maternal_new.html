@@ -1,0 +1,662 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-900:#3b1016;
+    --brand-800:#4b171f;
+    --brand-700:#6d2932;
+    --brand-600:#561c24;
+    --brand-300:#cda4aa;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f6;
+    --panel-bg:#fff5f6; /* card background tint */
+  }
+
+  .page-wrap { gap: 1rem; }
+
+  .card{
+    background: var(--panel-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius:1rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,.03);
+  }
+  .card-body{ padding: 1.25rem; }
+  .section-title{
+    font-weight: 800; letter-spacing:.2px;
+    display:flex; align-items:center; gap:.5rem;
+    padding:.35rem .75rem; border-radius:.75rem;
+    background:rgba(0,0,0,.03); color:var(--brand-800);
+    border: 1px solid rgba(0,0,0,.05); width: fit-content;
+  }
+  .helper{ color:#6c757d; font-size:.87rem; }
+
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-600); border-color:var(--brand-600); }
+
+  .finder{
+    border:1px solid var(--bs-border-color); border-radius:.9rem; padding:1rem; background:#fff;
+  }
+  .finder h6{ margin:0 0 .75rem 0; font-weight:700; letter-spacing:.2px; color:var(--brand-800); }
+  .finder .input-group .form-control{
+    border-top-left-radius:.7rem; border-bottom-left-radius:.7rem;
+  }
+  .finder .input-group .btn{
+    border-top-right-radius:.7rem; border-bottom-right-radius:.7rem;
+  }
+
+  .mini-card{
+    border:1px solid var(--bs-border-color); border-radius:.8rem; padding:.85rem;
+    background:#fff; margin-top:.65rem;
+  }
+  .mini-card .resident-name{ font-weight:800; letter-spacing:.15px; }
+  .mini-card .code-pill{
+    display:inline-block; padding:.125rem .5rem; border-radius:999px; font-size:.78rem;
+    background:var(--brand-100); color:var(--brand-700); border:1px solid var(--brand-300);
+  }
+
+  .is-invalid-msg{ color:#dc3545; font-size:.875rem; margin-top:.25rem; }
+
+  .spinner-inline{
+    display:inline-block; width:1rem; height:1rem;
+    border:.15rem solid #ddd; border-top-color:var(--brand-700);
+    border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:-.2rem;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg) } }
+
+  input[readonly].form-control { background-color: var(--brand-050); border-color: rgba(0,0,0,.06); }
+
+  .chip{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.35rem .6rem; border-radius:999px; background:#fff;
+    border:1px dashed rgba(0,0,0,.12); font-size:.85rem; margin-right:.4rem; color:#343a40;
+  }
+
+  .fieldset{
+    border:1px dashed rgba(0,0,0,.08); border-radius:.9rem; padding:1rem;
+    background: linear-gradient(180deg, rgba(255,255,255,.7), var(--panel-bg));
+  }
+  .legend{
+    font-weight:700; color:var(--brand-800); margin-bottom:.65rem; display:flex; align-items:center; gap:.4rem;
+  }
+
+  /* BMI status pill styles */
+  .bmi-pill{
+    display:inline-block; margin-left:.5rem; padding:.2rem .6rem;
+    border-radius:999px; font-size:.85rem; border:1px solid transparent;
+    vertical-align:middle;
+  }
+  .bmi-low{ background:#fff3cd; color:#8a6d3b; border-color:#ffe69c; }
+  .bmi-normal{ background:#e9f7ef; color:#0f5132; border-color:#a3cfbb; }
+  .bmi-over{ background:#fff2e2; color:#7a4800; border-color:#ffd8a8; }
+  .bmi-obese{ background:#fde2e2; color:#842029; border-color:#f5c2c7; }
+
+  /* Previous pregnancy table */
+  .pp-table thead th{ font-weight:700; }
+  .pp-table input, .pp-table select{ min-width: 7.5rem; }
+  .pp-controls { gap:.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+  <div class="row page-wrap">
+    <div class="col-12">
+
+      <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'bhw:dashboard' %}">Dashboard</a></li>
+          <li class="breadcrumb-item active" aria-current="page">New Maternal Record (BHW Intake)</li>
+        </ol>
+      </nav>
+
+      {% if messages %}{% for m in messages %}
+        <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+      {% endfor %}{% endif %}
+
+      <form id="maternalForm" method="post" novalidate autocomplete="off">
+        {% csrf_token %}
+
+        <!-- Mother & family -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-3">
+              {% bs_icon 'person-heart' %} Mother
+            </div>
+
+            <div class="row g-4">
+              <div class="col-lg-6">
+                <div class="finder">
+                  <h6>{% bs_icon 'search' %} Find Mother</h6>
+                  <div class="input-group">
+                    <input id="motherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                    <button class="btn btn-outline-secondary" type="button" id="motherClear" title="Clear">{% bs_icon 'x' %}</button>
+                  </div>
+                  <div class="helper mt-1">Search by <b>name</b> or resident <b>code</b>. Click <b>Select</b> to use.</div>
+
+                  <div id="motherResults" class="mt-2">
+                    <div class="text-muted">No results yet.</div>
+                  </div>
+
+                  <input type="hidden" id="person_id" name="person_id">
+                  <div id="motherInvalid" class="is-invalid-msg d-none">Please select a mother from results.</div>
+
+                  <div id="motherCard" class="mini-card d-none"></div>
+                </div>
+              </div>
+
+              <div class="col-lg-6">
+                <div class="finder">
+                  <h6>{% bs_icon 'person' %} Find Husband (optional)</h6>
+                  <div class="input-group">
+                    <input id="husbandSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                    <button class="btn btn-outline-secondary" type="button" id="husbandClear" title="Clear">{% bs_icon 'x' %}</button>
+                  </div>
+                  <div class="helper mt-1">Optional. Search by name or code and click <b>Select</b>.</div>
+
+                  <div id="husbandResults" class="mt-2">
+                    <div class="text-muted">No results yet.</div>
+                  </div>
+
+                  <input type="hidden" id="husband_id" name="husband_id">
+                  <div id="husbandCard" class="mini-card d-none"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-4">
+              <div class="col-md-4 col-lg-3">
+                <label class="form-label" for="family_id">Family ID</label>
+                <input id="family_id" name="family_id" type="number" class="form-control" placeholder="Optional">
+                <div class="helper">Optional link to family</div>
+              </div>
+              <div class="col-md-8 col-lg-9 d-flex align-items-end">
+                <div class="helper">
+                  <span class="chip">{% bs_icon 'person-badge' %} Mother record will autofill details below.</span>
+                  <span class="chip">{% bs_icon 'shield-check' %} Changes do not edit resident data.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mother details from Person -->
+            <div class="fieldset mt-4">
+              <div class="legend">
+                {% bs_icon 'journal-text' %} Mother Details (from Resident)
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4 col-lg-3">
+                  <label class="form-label" for="mother_dob_display">Date of Birth</label>
+                  <input id="mother_dob_display" type="date" class="form-control" readonly>
+                </div>
+                <div class="col-md-2 col-lg-2">
+                  <label class="form-label" for="mother_age_display">Age</label>
+                  <input id="mother_age_display" type="number" class="form-control" readonly>
+                </div>
+                <div class="col-md-6 col-lg-7">
+                  <label class="form-label" for="mother_occupation_display">Occupation</label>
+                  <input id="mother_occupation_display" type="text" class="form-control" readonly>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="mother_address_display">Address</label>
+                  <input id="mother_address_display" type="text" class="form-control" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Anthropometrics -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-3">
+              {% bs_icon 'activity' %} Anthropometrics
+            </div>
+            <div class="row g-3">
+              <div class="col-sm-4 col-md-3">
+                <label class="form-label" for="weight">Weight (kg)</label>
+                <input id="weight" name="weight" type="number" min="0" step="0.01" class="form-control" placeholder="e.g., 54.5">
+              </div>
+              <div class="col-sm-4 col-md-3">
+                <label class="form-label" for="height">Height (cm)</label>
+                <input id="height" name="height" type="number" min="0" step="0.1" class="form-control" placeholder="e.g., 160.5">
+              </div>
+
+              <!-- Auto BMI & Status -->
+              <div class="col-sm-8 col-md-6">
+                <label class="form-label" for="bmi_display">
+                  BMI <span id="bmi_status_badge" class="bmi-pill">—</span>
+                </label>
+                <input id="bmi_display" type="text" class="form-control" placeholder="Auto-calculated" readonly>
+                <div class="helper">Computed from Weight (kg) and Height (cm). Status is set automatically.</div>
+                <input type="hidden" id="bmi_value" name="bmi_value">
+                <input type="hidden" id="bmi_status_id" name="bmi_status_id">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Obstetric History -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-3">
+              {% bs_icon 'gender-female' %} Obstetric History
+            </div>
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label" for="gravida">Gravida</label>
+                <input id="gravida" name="gravida" type="number" min="0" class="form-control">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="para">Para</label>
+                <input id="para" name="para" type="number" min="0" class="form-control">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="num_children_born_alive">Children Born Alive</label>
+                <input id="num_children_born_alive" name="num_children_born_alive" type="number" min="0" class="form-control">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="num_children_living">Living Children</label>
+                <input id="num_children_living" name="num_children_living" type="number" min="0" class="form-control">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="num_large_babies">Large Babies (&gt;8 lbs)</label>
+                <input id="num_large_babies" name="num_large_babies" type="number" min="0" class="form-control">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="num_abortion">Abortions</label>
+                <input id="num_abortion" name="num_abortion" type="number" min="0" class="form-control">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="num_stillbirth">Stillbirths</label>
+                <input id="num_stillbirth" name="num_stillbirth" type="number" min="0" class="form-control">
+              </div>
+            </div>
+
+            <!-- Previous Pregnancy Details -->
+            <div class="fieldset mt-4">
+              <div class="legend">
+                {% bs_icon 'calendar3' %} Previous Pregnancy Details
+              </div>
+
+              <div class="d-flex pp-controls mb-2">
+                <button type="button" id="ppAddRow" class="btn btn-sm btn-outline-primary">
+                  {% bs_icon 'plus' %} Add Pregnancy
+                </button>
+                <div class="helper">Record prior deliveries and outcomes (optional).</div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table align-middle pp-table">
+                  <thead>
+                    <tr>
+                      <th style="min-width:9rem">Date of Delivery</th>
+                      <th>Outcome</th>
+                      <th>Type of Delivery</th>
+                      <th>Baby’s Wt (kg)</th>
+                      <th>Gender</th>
+                      <th style="min-width:10rem">Notes (Apgar / Ballard)</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ppTbody">
+                    <!-- rows inserted by JS -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- convenient JSON snapshot of rows -->
+              <input type="hidden" id="prev_pregnancies_json" name="prev_pregnancies_json">
+            </div>
+          </div>
+        </div>
+
+        <!-- Medical History -->
+        <div class="card mb-3">
+          <div class="card-body">
+<div class="section-title mb-3">
+  {% bs_icon 'heart-pulse' %} Medical History
+</div>
+
+
+            <div class="row g-3">
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                  <input id="has_diabetes" name="has_diabetes" type="checkbox" class="form-check-input">
+                  <label class="form-check-label" for="has_diabetes">Diabetes</label>
+                </div>
+              </div>
+
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                  <input id="has_hypertension" name="has_hypertension" type="checkbox" class="form-check-input">
+                  <label class="form-check-label" for="has_hypertension">Hypertension</label>
+                </div>
+              </div>
+
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                  <input id="has_asthma" name="has_asthma" type="checkbox" class="form-check-input">
+                  <label class="form-check-label" for="has_asthma">Bronchial Asthma</label>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="prev_illnesses">Previous Illness(es)</label>
+                <textarea id="prev_illnesses" name="prev_illnesses" rows="3" class="form-control" placeholder="List illnesses or significant conditions…"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="prev_hospitalizations">Previous Hospitalization(s)</label>
+                <textarea id="prev_hospitalizations" name="prev_hospitalizations" rows="3" class="form-control" placeholder="Dates / reasons for admission…"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="prev_preg_complications">Previous Pregnancy Complication(s)</label>
+                <textarea id="prev_preg_complications" name="prev_preg_complications" rows="3" class="form-control" placeholder="e.g., preeclampsia, GDM, antepartum hemorrhage…"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-brand">
+            {% bs_icon 'check2' extra_classes='me-2' %} Save record
+          </button>
+          <a class="btn btn-outline-secondary" href="{% url 'bhw:dashboard' %}">Cancel</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const SEARCH_URL   = "{% url 'bhw:ajax_resident_search' %}";
+  const CARD_URL     = "{% url 'bhw:ajax_person_card' %}";
+  const DETAILS_URL  = "{% url 'bhw:ajax_person_details' %}";
+  console.group('[BHW] maternal_new – autofill, UI, BMI, histories');
+  console.log('SEARCH_URL:', SEARCH_URL, 'CARD_URL:', CARD_URL, 'DETAILS_URL:', DETAILS_URL);
+
+  /* ---------- MINI CARD STYLING ---------- */
+  function styleMiniCard(host){
+    if (!host) return;
+    const nameEl = host.querySelector('strong, .resident-name') || host.firstElementChild;
+    if (nameEl && !nameEl.classList.contains('resident-name')) nameEl.classList.add('resident-name');
+    host.querySelectorAll('small, .badge').forEach(el=>{
+      if (!el.classList.contains('code-pill')) el.classList.add('code-pill');
+    });
+  }
+
+  /* ---------- MOTHER DETAILS AUTOFILL ---------- */
+  function setMotherDetails(p) {
+    const dob = document.getElementById('mother_dob_display');
+    const age = document.getElementById('mother_age_display');
+    const occ = document.getElementById('mother_occupation_display');
+    const adr = document.getElementById('mother_address_display');
+    const famnum = document.getElementById('family_id');
+
+    if (dob) dob.value = p?.birthdate || '';
+    if (age) age.value = (p?.age ?? '');
+    if (occ) occ.value = p?.occupation || '';
+    if (adr) adr.value = p?.address || '';
+    if (famnum && p?.family_num) famnum.value = p.family_num;
+    console.log('[BHW] Mother details set:', p);
+  }
+  function clearMotherDetails() {
+    setMotherDetails({ birthdate: '', age: '', occupation: '', address: '' });
+    console.log('[BHW] Mother details cleared');
+  }
+
+  /* ---------- SEARCH / PICKER WIRING ---------- */
+  function blockEnter(el){ el?.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); } }); }
+  function setResultsHost($host, html){ $host.innerHTML = html; }
+
+  function injectCardActions($card, {label, onChange, onRemove}) {
+    const actions = document.createElement('div');
+    actions.className = 'actions mt-2 d-flex gap-2';
+    actions.innerHTML = `
+      <button type="button" class="btn btn-sm btn-outline-secondary finder-change">{% bs_icon 'arrow-repeat' %} Change</button>
+      <button type="button" class="btn btn-sm btn-outline-danger finder-remove">{% bs_icon 'trash' %} Remove</button>
+    `;
+    $card.appendChild(actions);
+    $card.addEventListener('click', (e) => {
+      const changeBtn = e.target.closest('.finder-change');
+      const removeBtn = e.target.closest('.finder-remove');
+      if (changeBtn) onChange?.();
+      if (removeBtn) onRemove?.();
+    });
+  }
+
+  function bindFinder({label, inputId, resultsId, hiddenId, cardId, clearBtnId}) {
+    const $input   = document.getElementById(inputId);
+    const $results = document.getElementById(resultsId);
+    const $hidden  = document.getElementById(hiddenId);
+    const $card    = document.getElementById(cardId);
+    const $clear   = document.getElementById(clearBtnId);
+
+    if (!($input && $results && $hidden)) return;
+    blockEnter($input);
+
+    let timer = null;
+    const showNoResults = () => setResultsHost($results, '<div class="text-muted">No results yet.</div>');
+    const showTypeMore  = () => setResultsHost($results, '<div class="text-muted">Type at least 2 characters…</div>');
+
+    function closeSearchUI(){ $results.classList.add('d-none'); $input.readOnly = true; }
+    function openSearchUI(){ $results.classList.remove('d-none'); $input.readOnly = false; showTypeMore(); $input.focus(); }
+
+    // Debounced search
+    $input.addEventListener('input', () => {
+      const q = $input.value.trim();
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (q.length < 2) { showTypeMore(); return; }
+        setResultsHost($results, '<div class="py-2 text-center"><span class="spinner-inline"></span> Searching…</div>');
+        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(j => setResultsHost($results, j.ok ? j.html : '<div class="text-danger">Search failed.</div>'))
+          .catch(() => setResultsHost($results, '<div class="text-danger">Search failed.</div>'));
+      }, 250);
+    });
+
+    // Select resident
+    $results.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pick-resident');
+      if (!btn) return;
+      const pid = btn.getAttribute('data-person-id');
+      if (!pid) return;
+
+      $hidden.value = pid;
+      if (hiddenId === 'person_id') { document.getElementById('motherInvalid')?.classList.add('d-none'); }
+
+      if ($card) {
+        $card.classList.remove('d-none');
+        $card.innerHTML = '<div class="text-muted">Loading…</div>';
+        fetch(CARD_URL + '?person_id=' + encodeURIComponent(pid), { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(j => {
+            $card.innerHTML = j.html;
+            styleMiniCard($card);
+            injectCardActions($card, {
+              label,
+              onChange: () => openSearchUI(),
+              onRemove: () => {
+                $hidden.value = '';
+                $input.value = '';
+                $card.classList.add('d-none'); $card.innerHTML = '';
+                if (hiddenId === 'person_id') clearMotherDetails();
+                openSearchUI(); showNoResults();
+              }
+            });
+          });
+      }
+
+      if (hiddenId === 'person_id') {
+        fetch(DETAILS_URL + '?person_id=' + encodeURIComponent(pid), { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(j => {
+            if (j.ok) setMotherDetails(j.person);
+            else clearMotherDetails();
+            console.log('[BHW] details resp:', j);
+          })
+          .catch(err => { console.error('[BHW] details error', err); clearMotherDetails(); });
+      }
+
+      closeSearchUI();
+    });
+
+    // Clear (X)
+    $clear?.addEventListener('click', () => {
+      $input.value = ''; $hidden.value = '';
+      if ($card){ $card.classList.add('d-none'); $card.innerHTML = ''; }
+      if (hiddenId === 'person_id') clearMotherDetails();
+      openSearchUI(); showNoResults();
+    });
+
+    showNoResults();
+  }
+
+  bindFinder({label:'Mother',  inputId:'motherSearch',  resultsId:'motherResults',  hiddenId:'person_id',  cardId:'motherCard', clearBtnId:'motherClear'});
+  bindFinder({label:'Husband', inputId:'husbandSearch', resultsId:'husbandResults', hiddenId:'husband_id',  cardId:'husbandCard', clearBtnId:'husbandClear'});
+
+  /* ---------- BMI AUTO-COMPUTE ---------- */
+  const weightEl = document.getElementById('weight');
+  const heightEl = document.getElementById('height');
+  const bmiDisp  = document.getElementById('bmi_display');
+  const bmiHidden= document.getElementById('bmi_value');
+  const statusHidden = document.getElementById('bmi_status_id');
+  const statusBadge  = document.getElementById('bmi_status_badge');
+
+  function setBadge(text, cls){
+    if (!statusBadge) return;
+    statusBadge.textContent = text || '—';
+    statusBadge.className = 'bmi-pill ' + (cls || '');
+  }
+  function clearBMI(){
+    if (bmiDisp) bmiDisp.value = '';
+    if (bmiHidden) bmiHidden.value = '';
+    if (statusHidden) statusHidden.value = '';
+    setBadge('—','');
+  }
+  function computeBMI(){
+    const w = parseFloat(weightEl?.value || '');
+    const hcm = parseFloat(heightEl?.value || '');
+    if (!isFinite(w) || !isFinite(hcm) || hcm <= 0){
+      console.log('[BHW] BMI: waiting for valid weight/height', {w, hcm});
+      clearBMI();
+      return;
+    }
+    const m = hcm / 100.0;
+    const bmi = w / (m*m);
+    const bmiRounded = Math.round(bmi * 10) / 10;
+
+    let statusId = 0, label = '', cls = '';
+    if (bmi < 18.5){ statusId = 1; label='Low';        cls='bmi-low'; }
+    else if (bmi < 25){ statusId = 2; label='Normal';   cls='bmi-normal'; }
+    else if (bmi < 30){ statusId = 3; label='Overweight'; cls='bmi-over'; }
+    else { statusId = 4; label='Obese'; cls='bmi-obese'; }
+
+    if (bmiDisp) bmiDisp.value = bmiRounded.toFixed(1);
+    if (bmiHidden) bmiHidden.value = bmiRounded.toFixed(1);
+    if (statusHidden) statusHidden.value = String(statusId);
+    setBadge(label, cls);
+
+    console.log('[BHW] BMI computed:', { weight:w, height_cm:hcm, bmi:bmiRounded, statusId, label });
+  }
+  weightEl?.addEventListener('input', computeBMI);
+  heightEl?.addEventListener('input', computeBMI);
+  computeBMI();
+
+  /* ---------- PREVIOUS PREGNANCY REPEATER ---------- */
+  const ppTbody = document.getElementById('ppTbody');
+  const ppAddBtn = document.getElementById('ppAddRow');
+  const ppJson = document.getElementById('prev_pregnancies_json');
+
+  function ppRowTemplate(){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="date" name="pp_date[]" class="form-control"></td>
+      <td>
+        <select name="pp_outcome[]" class="form-select">
+          <option value="">—</option>
+          <option value="fullterm">Fullterm</option>
+          <option value="preterm">Preterm</option>
+          <option value="abortion">Abortion</option>
+          <option value="stillbirth">Stillbirth</option>
+        </select>
+      </td>
+      <td>
+        <select name="pp_type[]" class="form-select">
+          <option value="">—</option>
+          <option value="nsvd">NSVD</option>
+          <option value="cs">CS</option>
+          <option value="instrumental">Instrumental</option>
+        </select>
+      </td>
+      <td><input type="number" step="0.01" min="0" name="pp_baby_wt[]" class="form-control" placeholder="e.g., 3.2"></td>
+      <td>
+        <select name="pp_gender[]" class="form-select">
+          <option value="">—</option>
+          <option value="F">Female</option>
+          <option value="M">Male</option>
+        </select>
+      </td>
+      <td><input type="text" name="pp_notes[]" class="form-control" placeholder="Apgar/Ballard/remarks…"></td>
+      <td class="text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger pp-remove">{% bs_icon 'trash' %}</button>
+      </td>
+    `;
+    return tr;
+  }
+
+  function updatePPJson(){
+    const rows = Array.from(ppTbody.querySelectorAll('tr')).map(tr => {
+      return {
+        date: tr.querySelector('[name="pp_date[]"]').value || null,
+        outcome: tr.querySelector('[name="pp_outcome[]"]').value || null,
+        type: tr.querySelector('[name="pp_type[]"]').value || null,
+        baby_wt: tr.querySelector('[name="pp_baby_wt[]"]').value || null,
+        gender: tr.querySelector('[name="pp_gender[]"]').value || null,
+        notes: tr.querySelector('[name="pp_notes[]"]').value || null,
+      };
+    });
+    if (ppJson) ppJson.value = JSON.stringify(rows);
+    console.log('[BHW] Previous pregnancy rows ->', rows);
+  }
+
+  ppAddBtn?.addEventListener('click', () => {
+    ppTbody.appendChild(ppRowTemplate());
+    updatePPJson();
+    console.log('[BHW] Added previous pregnancy row. Total:', ppTbody.querySelectorAll('tr').length);
+  });
+
+  ppTbody?.addEventListener('input', updatePPJson);
+  ppTbody?.addEventListener('click', (e) => {
+    if (e.target.closest('.pp-remove')) {
+      const tr = e.target.closest('tr');
+      tr?.remove();
+      updatePPJson();
+      console.log('[BHW] Removed previous pregnancy row. Total:', ppTbody.querySelectorAll('tr').length);
+    }
+  });
+
+  /* ---------- SUBMIT GUARD ---------- */
+  document.getElementById('maternalForm')?.addEventListener('submit', (e) => {
+    const motherId = document.getElementById('person_id')?.value;
+    if (!motherId) {
+      e.preventDefault();
+      document.getElementById('motherInvalid')?.classList.remove('d-none');
+      document.getElementById('motherSearch')?.focus();
+    } else {
+      // ensure JSON snapshot up to date
+      updatePPJson();
+    }
+  });
+
+  console.groupEnd();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
+  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
+  .form-control:focus, .form-check-input:focus{ border-color:var(--brand-700); box-shadow:0 0 0 .25rem rgba(109,41,50,.25); outline:none; }
+  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+  .person-card{ background:linear-gradient(135deg,var(--brand-050) 0%,#fff 100%); padding:1.5rem; border-radius:12px; margin-bottom:1.5rem; border:1px solid var(--brand-100); box-shadow:0 2px 4px rgba(109,41,50,.08); }
+  .back-link{ margin-bottom:1rem; }
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6); border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+  .filter-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .65rem; border-radius:999px; font-size:.8rem; text-decoration:none; border:1px solid rgba(109,41,50,.18); background:var(--brand-050); color:var(--brand-700); }
+  .filter-chip:hover{ background:var(--brand-100); }
+  .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%; background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
+  .table thead th{ border-bottom-width:2px; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+  <div class="back-link">
+    <a href="{% url 'treasurer:people_requests' %}" class="btn btn-sm btn-outline-brand">
+      {% bs_icon 'arrow-left' %} Back to People List
+    </a>
+  </div>
+
+  <div class="person-card">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <h4 class="mb-1">{{ person.full_name }}</h4>
+        <div class="d-flex gap-3 text-muted small">
+          <span>{% bs_icon 'person-badge' extra_classes='me-1' %}Person ID: <strong>{{ person.person_id }}</strong></span>
+          <span>{% bs_icon 'file-text' extra_classes='me-1' %}Total Requests: <strong class="text-dark">{{ paginator.count }}</strong></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
+    <div class="searchbox">
+      {% bs_icon 'search' extra_classes='bi' %}
+      <input type="text" class="form-control" name="q" placeholder="Search by request code, OR number..." value="{{ q }}">
+    </div>
+    <button type="submit" class="btn btn-brand d-flex align-items-center">
+      {% bs_icon 'search' extra_classes='me-2' %} Search
+    </button>
+    <button class="btn btn-brand-subtle d-flex align-items-center" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+      {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+      <span class="badge rounded-pill text-bg-light ms-2" id="activeFiltersBadge" style="display:none;">0</span>
+    </button>
+  </form>
+
+  <div class="d-flex flex-wrap align-items-center mb-3" id="activeChips">
+    <span class="text-muted small">No active filters.</span>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Request History</h5>
+    <span class="text-muted small">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ paginator.count }}</span>
+  </div>
+  
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Request Code</th>
+          <th>Document Type</th>
+          <th>Purpose</th>
+          <th>Status</th>
+          <th class="text-end">Amount</th>
+          <th class="text-end">Total Paid</th>
+          <th class="text-end">Balance</th>
+          <th>OR Number</th>
+          <th>Created</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+          <tr>
+            <td><code class="text-muted">{{ r.request_code }}</code></td>
+            <td><small>{{ r.doc_types_display|default:"—" }}</small></td>
+            <td><small>{{ r.purposes_display|default:"—" }}</small></td>
+            <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+            <td class="text-end"><strong>₱{{ r.amount_due_f|floatformat:2 }}</strong></td>
+            <td class="text-end text-success">₱{{ r.total_paid_f|floatformat:2 }}</td>
+            <td class="text-end {% if r.balance_f > 0 %}text-danger{% else %}text-muted{% endif %}">₱{{ r.balance_f|floatformat:2 }}</td>
+            <td><code class="text-primary">{{ r.latest_or_number|default:"—" }}</code></td>
+            <td><small class="text-muted">{{ r.created_fmt }}</small></td>
+            <td>
+              <a href="{% url 'treasurer:detail' r.doc_request_id %}" class="btn btn-sm btn-outline-brand">
+                {% bs_icon 'eye' %}
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="10" class="text-center py-4 text-muted">No requests found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if paginator.num_pages > 1 %}
+    {% include 'paginator.html' with page_obj=page_obj %}
+  {% endif %}
+</div>
+
+<div class="offcanvas offcanvas-end" id="filterPanel" tabindex="-1" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top:100px;">
+  <div class="offcanvas-header" style="margin-top:50px;">
+    <h5>Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form method="get" id="filterForm">
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between">
+          <span>Statuses</span>
+          <div class="small">
+            <a href="#" id="selectAll" class="me-2">Select all</a>
+            <a href="#" id="clearAll">None</a>
+          </div>
+        </div>
+        <div class="row row-cols-1">
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input status-box" type="checkbox" name="status" value="FOR_TREASURER_REVIEW" id="st-FOR_TREASURER_REVIEW"><label class="form-check-label" for="st-FOR_TREASURER_REVIEW">For Treasurer Review</label></div></div>
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input status-box" type="checkbox" name="status" value="PAID" id="st-PAID"><label class="form-check-label" for="st-PAID">Paid</label></div></div>
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input status-box" type="checkbox" name="status" value="FOR_PRINTING" id="st-FOR_PRINTING"><label class="form-check-label" for="st-FOR_PRINTING">For Printing</label></div></div>
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input status-box" type="checkbox" name="status" value="READY_FOR_PICKUP" id="st-READY_FOR_PICKUP"><label class="form-check-label" for="st-READY_FOR_PICKUP">Ready for Pickup</label></div></div>
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input status-box" type="checkbox" name="status" value="RELEASED" id="st-RELEASED"><label class="form-check-label" for="st-RELEASED">Released</label></div></div>
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input status-box" type="checkbox" name="status" value="DECLINED" id="st-DECLINED"><label class="form-check-label" for="st-DECLINED">Declined</label></div></div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between">
+          <span>Document Types</span>
+          <div class="small">
+            <a href="#" id="selectAllDoc" class="me-2">Select all</a>
+            <a href="#" id="clearAllDoc">None</a>
+          </div>
+        </div>
+        <div class="row row-cols-1">
+          {% for dt in doc_types %}
+          <div class="col mb-2"><div class="form-check"><input class="form-check-input doc-type-box" type="checkbox" name="doc_type" value="{{ dt }}" id="dt-{{ forloop.counter }}"><label class="form-check-label" for="dt-{{ forloop.counter }}">{{ dt }}</label></div></div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Apply</button>
+        <a class="btn btn-outline-brand" href="?">{% bs_icon 'x-circle' extra_classes='me-1' %} Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+function getQS(){ return new URLSearchParams(window.location.search); }
+function getStatuses(){ const qs=getQS(); const vals=qs.getAll('status'); if(vals.length===1&&vals[0].includes(',')) return vals[0].split(',').map(s=>s.trim()).filter(Boolean); return vals; }
+function getDocTypes(){ const qs=getQS(); return qs.getAll('doc_type'); }
+function buildUrlWithout(param,drop){ const qs=getQS(); qs.delete(param); const kept=(param==='status'?getStatuses():getDocTypes()).filter(s=>s!==drop); kept.forEach(s=>qs.append(param,s)); const base=window.location.pathname; const q=qs.toString(); return q?base+'?'+q:base; }
+(function(){
+  const picked=new Set(getStatuses()), pickedDocs=new Set(getDocTypes());
+  document.querySelectorAll('.status-box').forEach(cb=>{ if(picked.has(cb.value)) cb.checked=true; });
+  document.querySelectorAll('.doc-type-box').forEach(cb=>{ if(pickedDocs.has(cb.value)) cb.checked=true; });
+  const chips=document.getElementById('activeChips'); chips.innerHTML='';
+  const total=picked.size+pickedDocs.size;
+  if(total){
+    const label=document.createElement('span'); label.className='text-muted me-1'; label.textContent='Active:'; chips.appendChild(label);
+    picked.forEach(s=>{
+      const a=document.createElement('a'); a.className='filter-chip'; a.href=buildUrlWithout('status',s);
+      a.innerHTML=s.replaceAll('_',' ').toLowerCase().replace(/(^|\s)\S/g,t=>t.toUpperCase())+' <span class="x">×</span>';
+      chips.appendChild(a);
+    });
+    pickedDocs.forEach(s=>{
+      const a=document.createElement('a'); a.className='filter-chip'; a.href=buildUrlWithout('doc_type',s);
+      a.innerHTML=s+' <span class="x">×</span>';
+      chips.appendChild(a);
+    });
+    const clear=document.createElement('a'); clear.className='btn btn-sm btn-outline-brand ms-1';
+    const qs=new URLSearchParams(window.location.search); qs.delete('status'); qs.delete('doc_type');
+    clear.href=window.location.pathname+(qs.toString()?'?'+qs.toString():'');
+    clear.innerHTML='{% bs_icon "x-circle" extra_classes="me-1" %} Clear all';
+    chips.appendChild(clear);
+  }else{ chips.innerHTML='<span class="text-muted small">No active filters.</span>'; }
+  const badge=document.getElementById('activeFiltersBadge');
+  if(badge){ if(total){ badge.style.display='inline-block'; badge.textContent=total; }else{ badge.style.display='none'; } }
+  const selAll=document.getElementById('selectAll'), clrAll=document.getElementById('clearAll');
+  const selAllDoc=document.getElementById('selectAllDoc'), clrAllDoc=document.getElementById('clearAllDoc');
+  if(selAll) selAll.addEventListener('click',e=>{ e.preventDefault(); document.querySelectorAll('.status-box').forEach(b=>b.checked=true); });
+  if(clrAll) clrAll.addEventListener('click',e=>{ e.preventDefault(); document.querySelectorAll('.status-box').forEach(b=>b.checked=false); });
+  if(selAllDoc) selAllDoc.addEventListener('click',e=>{ e.preventDefault(); document.querySelectorAll('.doc-type-box').forEach(b=>b.checked=true); });
+  if(clrAllDoc) clrAllDoc.addEventListener('click',e=>{ e.preventDefault(); document.querySelectorAll('.doc-type-box').forEach(b=>b.checked=false); });
+  const filterForm=document.getElementById('filterForm');
+  if(filterForm) filterForm.addEventListener('submit',function(e){
+    const q=new URLSearchParams(window.location.search).get('q');
+    if(q){ const input=document.createElement('input'); input.type='hidden'; input.name='q'; input.value=q; this.appendChild(input); }
+  });
+})();
+</script>
+{% endblock %}

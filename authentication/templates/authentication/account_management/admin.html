@@ -1,0 +1,48 @@
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+    <div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-lg-0">
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'staff_admin:dashboard' %}">Dashboard</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'staff_admin:staff_selection' %}">Document Requests</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}">Identity Verification</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Records</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'staff_admin:staff_list' %}">Staff List</a>
+                </li>
+                <!-- <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="staffManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Staff Directory
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="staffManagementDropdown">
+                        <li>
+                            <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'staff_admin:staff_account_requests_list' %}">
+                                Staff Account Requests
+                            </a>
+                        </li>
+                        <li><a class="dropdown-item" href="{% url 'staff_admin:staff_requests_list' %}">My Staff Requests</a></li>
+                    </ul>
+                </li> -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="systemLogsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        System Logs
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="systemLogsDropdown">
+                        <li><a class="dropdown-item" href="{% url 'staff_admin:access_logs' %}">Access Log</a></li>
+                        <li><a class="dropdown-item" href="{% url 'staff_admin:operational_logs' %}">User Log</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>

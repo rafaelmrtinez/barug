@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{# Use the same theme variables and small set of styles from captain_dashboard.html #}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'doc_ingest/faqs.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2" style="margin-top: 24px;">
+
+  <div class="page-cap">
+    <div class="mt-5">
+      <h1>{{ page_title }}</h1>
+      <div class="subtitle">Frequently asked questions about barangay services and procedures.</div>
+    </div>
+    <div>
+      <a class="btn btn-outline-secondary" href="#" onclick="history.back(); return false;">Back</a>
+    </div>
+  </div>
+
+  <div class="faq-grid">
+    <div>
+      <div class="cardx">
+        <div class="cap"><h2>All FAQs</h2></div>
+        <div class="body">
+          <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+            <form id="faq-search-form" method="get" action="" style="flex:1;">
+              <input id="faq-search" name="q" class="form-control form-control-sm" type="search" placeholder="Search FAQs..." value="{{ q|default:'' }}">
+            </form>
+            <div style="min-width:120px; text-align:right;">
+              <small class="text-muted">Showing {{ page_obj.paginator.count }} results</small>
+            </div>
+          </div>
+
+          {% if faqs %}
+            <div class="faq-list">
+              {% for f in faqs %}
+                <div class="faq-item">
+                  <div class="q">Q. {{ f.question }}</div>
+                  <div class="a">{{ f.answer }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty">No FAQs available right now.</div>
+          {% endif %}
+
+          {# pagination controls #}
+          {% if page_obj.has_other_pages %}
+            <nav aria-label="FAQ pagination" style="margin-top:14px; display:flex; justify-content:center;">
+              <ul class="pagination" style="list-style:none; display:flex; gap:6px; padding:0; margin:0;">
+                {% if page_obj.has_previous %}
+                  <li><a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Prev</a></li>
+                {% else %}
+                  <li><button class="btn btn-outline-secondary btn-sm" disabled>Prev</button></li>
+                {% endif %}
+
+                {# show a few page numbers #}
+                {% with total=page_obj.paginator.num_pages current=page_obj.number last_minus_two=page_obj.paginator.num_pages|add:"-2" last_minus_three=page_obj.paginator.num_pages|add:"-3" num_minus_one=page_obj.number|add:"-1" num_plus_one=page_obj.number|add:"1" %}
+                {% for num in page_obj.paginator.page_range %}
+                  {% if total > 9 %}
+                    {% if num <= 2 or num > last_minus_two %}
+                      {% if num == current %}
+                        <li><button class="btn btn-primary btn-sm" disabled>{{ num }}</button></li>
+                      {% else %}
+                        <li><a class="btn btn-outline-secondary btn-sm" href="?page={{ num }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ num }}</a></li>
+                      {% endif %}
+                    {% elif num >= num_minus_one and num <= num_plus_one %}
+                      {% if num == current %}
+                        <li><button class="btn btn-primary btn-sm" disabled>{{ num }}</button></li>
+                      {% else %}
+                        <li><a class="btn btn-outline-secondary btn-sm" href="?page={{ num }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ num }}</a></li>
+                      {% endif %}
+                    {% elif num == 3 and current > 4 %}
+                      <li><span style="padding:6px 8px;">…</span></li>
+                    {% elif num == last_minus_two and current < last_minus_three %}
+                      <li><span style="padding:6px 8px;">…</span></li>
+                    {% endif %}
+                  {% else %}
+                    {% if num == current %}
+                      <li><button class="btn btn-primary btn-sm" disabled>{{ num }}</button></li>
+                    {% else %}
+                      <li><a class="btn btn-outline-secondary btn-sm" href="?page={{ num }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ num }}</a></li>
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {% endwith %}
+
+                {% if page_obj.has_next %}
+                  <li><a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Next</a></li>
+                {% else %}
+                  <li><button class="btn btn-outline-secondary btn-sm" disabled>Next</button></li>
+                {% endif %}
+              </ul>
+            </nav>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cardx">
+        <div class="cap"><h2>Help & Contact</h2></div>
+        <div class="body">
+          <p class="mb-2">If your question isn't listed, contact the Barangay Hall or check the relevant office's page.</p>
+            <p style="margin:0; color:var(--muted);">Phone: <a href="tel:+6332265786">(032) 265-786 / 503-3115</a><br/>
+              Email: <a href="mailto:bss@hotmail.ph?subject=FAQ%20Inquiry">bss@hotmail.ph</a></p>
+            <p style="margin:0; color:var(--muted);">Address: <a href="https://www.google.com/maps/search/?api=1&query=032+Legaspi+Street,+Cebu+City" target="_blank" rel="noopener noreferrer">032 Legaspi Street, Cebu City</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'doc_ingest/faqs.js' %}"></script>
+{% endblock %}

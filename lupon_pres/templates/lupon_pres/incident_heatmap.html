@@ -1,0 +1,809 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block css %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css" rel="stylesheet">
+<style>
+    #map {
+        height: 600px;
+        width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .stats-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .incident-type-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        margin: 2px;
+    }
+    .severity-high { background-color: #dc3545; color: white; }
+    .severity-medium { background-color: #fd7e14; color: white; }
+    .severity-low { background-color: #28a745; color: white; }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 20px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
+    .street-stats-table {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .map-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .incident-popup {
+        max-width: 300px;
+    }
+    .incident-popup h6 {
+        color: #495057;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 5px;
+    }
+    .popup-detail {
+        margin-bottom: 5px;
+        font-size: 0.9rem;
+    }
+    .popup-detail strong {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" >
+    <!-- Header -->
+    <div class="row mb-4" style="margin-top: 100px;">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">{{ page_title }}</h2>
+                    <p class="text-muted mb-0">Comprehensive incident mapping and analysis for Barangay Sto. Niño</p>
+                </div>
+                <div class="btn-group">
+                    <button id="toggleHeatmap" class="btn btn-outline-primary">
+                        <i class="bi bi-thermometer-half"></i> Toggle Heatmap
+                    </button>
+                    <button id="showStreets" class="btn btn-outline-secondary">
+                        <i class="bi bi-list-ul"></i> Street View
+                    </button>
+                    <button id="showCharts" class="btn btn-outline-info">
+                        <i class="bi bi-bar-chart"></i> Analytics
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-card">
+                <h6 class="mb-3"><i class="bi bi-funnel"></i> Filters & Controls</h6>
+                <form method="get" id="filterForm">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">Time Period</label>
+                            <select name="time_filter" class="form-select" onchange="this.form.submit()">
+                                <option value="1_month" {% if time_filter == '1_month' %}selected{% endif %}>Last Month</option>
+                                <option value="3_months" {% if time_filter == '3_months' %}selected{% endif %}>Last 3 Months</option>
+                                <option value="6_months" {% if time_filter == '6_months' %}selected{% endif %}>Last 6 Months</option>
+                                <option value="1_year" {% if time_filter == '1_year' %}selected{% endif %}>Last Year</option>
+                                <option value="all" {% if time_filter == 'all' %}selected{% endif %}>All Time</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Incident Type</label>
+                            <select name="case_type" class="form-select" onchange="this.form.submit()">
+                                <option value="all">All Types</option>
+                                {% for case_type in case_types %}
+                                    <option value="{{ case_type }}" {% if case_type_filter == case_type %}selected{% endif %}>{{ case_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Settlement Status</label>
+                            <select name="settlement" class="form-select" onchange="this.form.submit()">
+                                <option value="all">All Statuses</option>
+                                <option value="settled" {% if settlement_filter == 'settled' %}selected{% endif %}>Settled</option>
+                                <option value="pending" {% if settlement_filter == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="not_settled" {% if settlement_filter == 'not_settled' %}selected{% endif %}>Not Settled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Map Style</label>
+                            <select id="mapStyle" class="form-select">
+                                <option value="streets-v11">Streets</option>
+                                <option value="satellite-v9">Satellite</option>
+                                <option value="outdoors-v11">Outdoors</option>
+                                <option value="light-v10">Light</option>
+                                <option value="dark-v10">Dark</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="totalIncidents">{{ incident_data|length }}</div>
+                <div class="stats-label">Total Incidents</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="mappedIncidents">0</div>
+                <div class="stats-label">Mapped Incidents</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="settledCount">0</div>
+                <div class="stats-label">Settled Cases</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="settlementRate">0%</div>
+                <div class="stats-label">Settlement Rate</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="blotterReports">{{ blotter_reports_count }}</div>
+                <div class="stats-label">Blotter Reports</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="blotterCases">{{ blotter_cases_count }}</div>
+                <div class="stats-label">Blotter Cases</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Map Section -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body p-0 position-relative">
+                    <div class="map-controls">
+                        <div class="btn-group-vertical btn-group-sm">
+                            <button id="zoomIn" class="btn btn-outline-secondary" title="Zoom In">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button id="zoomOut" class="btn btn-outline-secondary" title="Zoom Out">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <button id="resetView" class="btn btn-outline-secondary" title="Reset View">
+                                <i class="bi bi-house"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            
+            <!-- Street View Table -->
+            <div id="streetView" style="display:none;" class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-geo-alt"></i> Incidents by Street</h6>
+                </div>
+                <div class="card-body">
+                    <div class="street-stats-table">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Street</th>
+                                    <th>Barangay</th>
+                                    <th>Incidents</th>
+                                    <th>Settled</th>
+                                    <th>Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="streetTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Charts -->
+            <div id="chartsView" style="display:none;" class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Incident Analytics</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Incidents by Type</h6>
+                            <div class="chart-container">
+                                <canvas id="typeChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Monthly Trend</h6>
+                            <div class="chart-container">
+                                <canvas id="trendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Legend -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> Map Legend</h6>
+                </div>
+                <div class="card-body">
+                    <div class="legend-item">
+                        <div class="legend-color severity-high"></div>
+                        <span>High Priority (Unresolved/Escalated)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color severity-medium"></div>
+                        <span>Medium Priority (In Progress)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color severity-low"></div>
+                        <span>Low Priority (Settled/Resolved)</span>
+                    </div>
+                    <hr>
+                    <small class="text-muted">
+                        <i class="bi bi-lightbulb"></i> 
+                        Click on markers for details. Use heatmap to see incident density patterns.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Incident Types Summary
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-pie-chart"></i> Incident Types</h6>
+                </div>
+                <div class="card-body">
+                    <div id="incidentTypesList">
+                        {% for stat in incident_stats %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="incident-type-badge severity-{% if stat.settlement_rate >= 70 %}low{% elif stat.settlement_rate >= 40 %}medium{% else %}high{% endif %}">
+                                    {{ stat.type }}
+                                </span>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted">{{ stat.total_count }} cases</small><br>
+                                <small class="text-success">{{ stat.settlement_rate }}% settled</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div> -->
+
+            <!-- Top Streets -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> High-Incident Areas</h6>
+                </div>
+                <div class="card-body">
+                    {% for street in street_stats|slice:":5" %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>{{ street.street }}</strong><br>
+                            <small class="text-muted">{{ street.barangay }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-danger">{{ street.incident_count }}</span><br>
+                            <small class="text-success">{{ street.settlement_rate }}% settled</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoicmFwaGJlbGwiLCJhIjoiY21jNHN6ODhtMDRteDJpcHdocXJpaTFpaiJ9.tkV7UFKy4yBlAtkZNYOS4A';
+
+// Data from Django
+const incidentData = {{ incident_data_json|safe }};
+const incidentStats = {{ incident_stats|safe }};
+const streetStats = {{ street_stats|safe }};
+
+// State variables
+let isHeatmapVisible = false;
+let isStreetViewVisible = false;
+let isChartsViewVisible = false;
+let typeChart = null;
+let trendChart = null;
+
+// Initialize map
+const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [123.9028, 10.2951],
+    zoom: 13
+});
+
+// Add navigation control
+map.addControl(new mapboxgl.NavigationControl(), 'bottom-left');
+
+// Map load event
+map.on('load', function() {
+    initializeMap();
+    updateStatistics();
+    initializeCharts();
+});
+
+function initializeMap() {
+    // Filter incidents with valid coordinates
+    const validIncidents = incidentData.filter(incident => 
+        incident.lat && incident.lng && 
+        incident.lat !== 0 && incident.lng !== 0
+    );
+    
+    if (validIncidents.length === 0) {
+        // No valid coordinates, show center marker only
+        new mapboxgl.Marker({
+            color: '#6c757d'
+        })
+            .setLngLat([123.9028, 10.2951])
+            .setPopup(new mapboxgl.Popup().setHTML(
+                '<div class="incident-popup"><h6>Barangay Sto. Niño Center</h6><p>No incident coordinates available for the selected filters.</p></div>'
+            ))
+            .addTo(map);
+        return;
+    }
+    
+    // Add incident data source
+    map.addSource('incidents', {
+        type: 'geojson',
+        data: {
+            type: 'FeatureCollection',
+            features: validIncidents.map(incident => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [incident.lng, incident.lat]
+                },
+                properties: {
+                    id: incident.id,
+                    name: incident.name,
+                    type: incident.type,
+                    date: incident.date,
+                    time: incident.time,
+                    description: incident.description,
+                    street: incident.street,
+                    barangay: incident.barangay,
+                    purok: incident.purok,
+                    case_status: incident.case_status,
+                    settlement_status: incident.settlement_status,
+                    severity: incident.severity
+                }
+            }))
+        }
+    });
+    
+    // Add circle markers layer with severity-based colors
+    map.addLayer({
+        id: 'incident-points',
+        type: 'circle',
+        source: 'incidents',
+        paint: {
+            'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 6,
+                15, 12,
+                20, 20
+            ],
+            'circle-color': [
+                'match',
+                ['get', 'severity'],
+                'High', '#dc3545',
+                'Medium', '#fd7e14', 
+                'Low', '#28a745',
+                '#6c757d' // default
+            ],
+            'circle-stroke-color': '#fff',
+            'circle-stroke-width': 2,
+            'circle-opacity': 0.8
+        }
+    });
+    
+    // Add enhanced heatmap layer
+    map.addLayer({
+        id: 'incident-heatmap',
+        type: 'heatmap',
+        source: 'incidents',
+        layout: {
+            visibility: 'none'
+        },
+        paint: {
+            // Weight heatmap by severity levels
+            'heatmap-weight': [
+                'match',
+                ['get', 'severity'],
+                'Low', 0.5,
+                'Medium', 1,
+                'High', 2,
+                1
+            ],
+            'heatmap-intensity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 1,
+                15, 3
+            ],
+            'heatmap-color': [
+                'interpolate',
+                ['linear'],
+                ['heatmap-density'],
+                0, 'rgba(33,102,172,0)',
+                0.2, 'rgb(103,169,207)',
+                0.4, 'rgb(209,229,240)',
+                0.6, 'rgb(253,219,199)',
+                0.8, 'rgb(239,138,98)',
+                1, 'rgb(178,24,43)'
+            ],
+            'heatmap-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 20,
+                15, 40
+            ]
+        }
+    });
+    
+    // Enhanced click event for popups
+    map.on('click', 'incident-points', function(e) {
+        const coordinates = e.features[0].geometry.coordinates.slice();
+        const props = e.features[0].properties;
+        
+        const popupContent = `
+            <div class="incident-popup">
+                <h6>${props.name}</h6>
+                <div class="popup-detail"><strong>Type:</strong> ${props.type}</div>
+                <div class="popup-detail"><strong>Date:</strong> ${props.date} ${props.time || ''}</div>
+                <div class="popup-detail"><strong>Location:</strong> ${props.street}, ${props.purok}</div>
+                <div class="popup-detail"><strong>Status:</strong> 
+                    <span class="badge bg-${props.settlement_status === 'Settled' ? 'success' : 'warning'}">
+                        ${props.settlement_status}
+                    </span>
+                </div>
+                <div class="popup-detail"><strong>Priority:</strong> 
+                    <span class="badge bg-${props.severity === 'High' ? 'danger' : props.severity === 'Medium' ? 'warning' : 'success'}">
+                        ${props.severity}
+                    </span>
+                </div>
+                <div class="popup-detail mt-2"><strong>Description:</strong></div>
+                <div class="text-muted small">${props.description.substring(0, 150)}${props.description.length > 150 ? '...' : ''}</div>
+            </div>
+        `;
+        
+        new mapboxgl.Popup({ className: 'incident-popup-container' })
+            .setLngLat(coordinates)
+            .setHTML(popupContent)
+            .addTo(map);
+    });
+    
+    // Enhanced hover effects
+    map.on('mouseenter', 'incident-points', () => {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+    
+    map.on('mouseleave', 'incident-points', () => {
+        map.getCanvas().style.cursor = '';
+    });
+    
+    // Fit map to show all incidents with better padding
+    if (validIncidents.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        validIncidents.forEach(incident => {
+            bounds.extend([incident.lng, incident.lat]);
+        });
+        map.fitBounds(bounds, { 
+            padding: { top: 50, bottom: 50, left: 50, right: 50 },
+            maxZoom: 16
+        });
+    }
+}
+
+function updateStatistics() {
+    const validIncidents = incidentData.filter(incident => 
+        incident.lat && incident.lng && 
+        incident.lat !== 0 && incident.lng !== 0
+    );
+    
+    const settledCount = incidentData.filter(incident => {
+        const s = (incident.settlement_status || '').trim().toLowerCase();
+        return s === 'settled';
+    }).length;
+    
+    const settlementRate = incidentData.length > 0 ? 
+        Math.round((settledCount / incidentData.length) * 100) : 0;
+    
+    document.getElementById('mappedIncidents').textContent = validIncidents.length;
+    document.getElementById('settledCount').textContent = settledCount;
+    document.getElementById('settlementRate').textContent = settlementRate + '%';
+}
+
+function initializeCharts() {
+    // Incident Types Chart
+    const typeCtx = document.getElementById('typeChart').getContext('2d');
+    const typeLabels = incidentStats.map(stat => stat.type);
+    const typeCounts = incidentStats.map(stat => stat.total_count);
+    
+    typeChart = new Chart(typeCtx, {
+        type: 'doughnut',
+        data: {
+            labels: typeLabels,
+            datasets: [{
+                data: typeCounts,
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                    '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+    
+    // Monthly Trend Chart (last 12 months)
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    const monthlyData = generateMonthlyTrend();
+    
+    trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: monthlyData.labels,
+            datasets: [{
+                label: 'Incidents',
+                data: monthlyData.data,
+                borderColor: '#36A2EB',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function generateMonthlyTrend() {
+    const now = new Date();
+    const months = [];
+    const counts = new Array(12).fill(0);
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(d.toLocaleString('en', { month: 'short' }));
+    }
+    incidentData.forEach(incident => {
+        if (!incident.date) return;
+        const d = new Date(incident.date);
+        if (isNaN(d)) return;
+        const diffMonths = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        if (diffMonths >= 0 && diffMonths < 12) {
+            counts[11 - diffMonths] += 1;
+        }
+    });
+    return { labels: months, data: counts };
+}
+
+// Event Listeners
+document.getElementById('toggleHeatmap').addEventListener('click', function() {
+    if (isHeatmapVisible) {
+        map.setLayoutProperty('incident-heatmap', 'visibility', 'none');
+        map.setLayoutProperty('incident-points', 'visibility', 'visible');
+        this.innerHTML = '<i class="bi bi-thermometer-half"></i> Show Heatmap';
+    } else {
+        map.setLayoutProperty('incident-points', 'visibility', 'none');
+        map.setLayoutProperty('incident-heatmap', 'visibility', 'visible');
+        this.innerHTML = '<i class="bi bi-geo-alt"></i> Show Points';
+    }
+    isHeatmapVisible = !isHeatmapVisible;
+});
+
+document.getElementById('showStreets').addEventListener('click', function() {
+    hideAllViews();
+    if (!isStreetViewVisible) {
+        document.getElementById('streetView').style.display = 'block';
+        this.innerHTML = '<i class="bi bi-map"></i> Map View';
+        buildStreetView();
+        isStreetViewVisible = true;
+    } else {
+        this.innerHTML = '<i class="bi bi-list-ul"></i> Street View';
+        isStreetViewVisible = false;
+    }
+});
+
+document.getElementById('showCharts').addEventListener('click', function() {
+    hideAllViews();
+    if (!isChartsViewVisible) {
+        document.getElementById('chartsView').style.display = 'block';
+        this.innerHTML = '<i class="bi bi-map"></i> Map View';
+        isChartsViewVisible = true;
+        // Resize charts after showing
+        setTimeout(() => {
+            if (typeChart) typeChart.resize();
+            if (trendChart) trendChart.resize();
+        }, 100);
+    } else {
+        this.innerHTML = '<i class="bi bi-bar-chart"></i> Analytics';
+        isChartsViewVisible = false;
+    }
+});
+
+function hideAllViews() {
+    document.getElementById('streetView').style.display = 'none';
+    document.getElementById('chartsView').style.display = 'none';
+    
+    // Reset button states
+    document.getElementById('showStreets').innerHTML = '<i class="bi bi-list-ul"></i> Street View';
+    document.getElementById('showCharts').innerHTML = '<i class="bi bi-bar-chart"></i> Analytics';
+    
+    isStreetViewVisible = false;
+    isChartsViewVisible = false;
+}
+
+function buildStreetView() {
+    const streetCounts = {};
+    
+    incidentData.forEach(incident => {
+        const street = incident.street || 'Unknown Street';
+        const barangay = incident.barangay || 'Unknown Barangay';
+        const key = `${street}|${barangay}`;
+        
+        if (!streetCounts[key]) {
+            streetCounts[key] = {
+                street: street,
+                barangay: barangay,
+                count: 0,
+                settled: 0
+            };
+        }
+        streetCounts[key].count++;
+        if ((incident.settlement_status || '').trim().toLowerCase() === 'settled') {
+            streetCounts[key].settled++;
+        }
+    });
+    
+    const tbody = document.getElementById('streetTable');
+    tbody.innerHTML = '';
+    
+    Object.values(streetCounts)
+        .sort((a, b) => b.count - a.count)
+        .forEach(item => {
+            const rate = item.count > 0 ? Math.round((item.settled / item.count) * 100) : 0;
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = item.street;
+            row.insertCell(1).textContent = item.barangay;
+            row.insertCell(2).innerHTML = `<span class="badge bg-danger">${item.count}</span>`;
+            row.insertCell(3).innerHTML = `<span class="badge bg-success">${item.settled}</span>`;
+            row.insertCell(4).innerHTML = `<span class="badge bg-${rate >= 70 ? 'success' : rate >= 40 ? 'warning' : 'danger'}">${rate}%</span>`;
+        });
+}
+
+// Map style selector
+document.getElementById('mapStyle').addEventListener('change', function() {
+    map.setStyle('mapbox://styles/mapbox/' + this.value);
+    map.once('styledata', function() {
+        // Re-add data sources and layers after style change
+        setTimeout(initializeMap, 500);
+    });
+});
+
+// Map controls
+document.getElementById('zoomIn').addEventListener('click', () => {
+    map.zoomIn();
+});
+
+document.getElementById('zoomOut').addEventListener('click', () => {
+    map.zoomOut();
+});
+
+document.getElementById('resetView').addEventListener('click', () => {
+    map.flyTo({
+        center: [123.9028, 10.2951],
+        zoom: 13,
+        duration: 1000
+    });
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Any additional initialization can go here
+});
+</script>
+{% endblock %}

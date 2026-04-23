@@ -1,0 +1,711 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Form Builder</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --brand:#7B1E22; --brand-700:#6a1a1e; --accent:#D4AF37;
+      --ink:#212529; --muted:#6c757d; --card:#ffffff; --bg:#faf9f8; --ring:rgba(123,30,34,.25);
+      --dropdown-bg:#ffffff; --dropdown-border:#c7c7c7; --dropdown-hover:#f3efe9; --dropdown-active:#eadfcd;
+      --dropdown-shadow: 0 10px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
+    }
+    html, body { background: var(--bg); }
+    .page-wrap { max-width:1120px; margin:0 auto; padding:1.25rem; }
+
+    .hero { border-radius:16px; background:#fff; border:1px solid rgba(0,0,0,.06); padding:1rem 1.25rem; }
+    .hero .title { font-weight:700; letter-spacing:.2px; margin:0; }
+    .hero .eyebrow { text-transform:uppercase; font-size:.75rem; color:var(--muted); letter-spacing:.18rem; }
+
+    .badge-code{ display:inline-flex; gap:.35rem; font:500 12px ui-monospace,Menlo,Consolas,monospace;
+      padding:.35rem .55rem; border-radius:.5rem; background:#f7f4ef; color:var(--brand);
+      border:1px solid rgba(0,0,0,.06); }
+    .hash{ opacity:.65; }
+
+    .card{ border:1px solid rgba(0,0,0,.06); border-radius:16px; background:var(--card);
+      box-shadow:0 2px 8px rgba(0,0,0,.03), 0 1px 0 rgba(212,175,55,.12) inset; }
+    .card .card-header{ background:#fff; border-bottom:1px solid rgba(0,0,0,.06); border-radius:16px 16px 0 0!important; padding:.9rem 1rem; }
+    .card .card-body{ padding:1.1rem; }
+
+    .form-label{ font-weight:600; color:var(--ink); }
+    .label-req::after{ content:" *"; color:#dc3545; }
+    .form-control, .input-group-text{ border-radius:.65rem; border-color:rgba(0,0,0,.12); }
+    .form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 .2rem var(--ring); }
+
+    .row.g-3 > [class*="col-"]{ scroll-margin-top:100px; }
+
+    .sticky-actions{
+      position:sticky; bottom:0; background:#fff; border-top:1px solid rgba(0,0,0,.06);
+      padding:.8rem 1rem; display:flex; justify-content:space-between; gap:.75rem; border-radius:0 0 16px 16px;
+    }
+    .hint{ color:var(--muted); font-size:.9rem; }
+
+    .btn-brand{
+      --bs-btn-bg:var(--brand); --bs-btn-border-color:var(--brand);
+      --bs-btn-hover-bg:var(--brand-700); --bs-btn-hover-border-color:var(--brand-700);
+      --bs-btn-focus-shadow-rgb:123,30,34; --bs-btn-active-bg:var(--brand-700); --bs-btn-active-border-color:var(--brand-700);
+      color:#fff;
+    }
+    .btn-outline-brand{
+      --bs-btn-color:var(--brand); --bs-btn-border-color:var(--brand);
+      --bs-btn-hover-bg:var(--brand); --bs-btn-hover-border-color:var(--brand);
+      --bs-btn-active-bg:var(--brand); --bs-btn-active-border-color:var(--brand);
+      color:var(--brand);
+    }
+    .btn i{ vertical-align:-1px; }
+    .btn-link-compact{ border-radius:12px; border:1px solid rgba(0,0,0,.08); padding:.45rem .7rem; color:var(--ink); background:#fff; }
+    .btn-link-compact:hover{ border-color:var(--brand); color:var(--brand); }
+    .subtle{ color:var(--muted); }
+
+    /* Typeahead */
+    .typeahead-wrap{ position:relative; }
+    .typeahead-dropdown{
+      position:absolute; left:0; right:0; top:100%;
+      background:var(--dropdown-bg);
+      border:1px solid var(--dropdown-border);
+      border-radius:.65rem;
+      box-shadow: var(--dropdown-shadow);
+      margin-top:.25rem;
+      max-height: 280px;
+      overflow:auto;
+      z-index: 1050;
+      display:none;
+    }
+    .typeahead-item{ padding:.55rem .75rem; font-size:.95rem; line-height:1.2; color:#1b1b1b; background:transparent; border:0; text-align:left; width:100%; }
+    .typeahead-item:hover{ background:var(--dropdown-hover); }
+    .typeahead-empty{ padding:.6rem .8rem; color:#666; font-size:.9rem; }
+
+    .kp-offscreen{ position:absolute !important; left:-10000px !important; top:auto !important; width:1px !important; height:1px !important; overflow:hidden !important; }
+
+    .att-chips{ display:flex; flex-wrap:wrap; gap:.4rem; }
+    .att-chip{ display:inline-flex; align-items:center; gap:.35rem; border:1px solid rgba(0,0,0,.08); background:#fff; border-radius:999px; padding:.25rem .55rem; }
+    .att-chip .x{ border:0; background:transparent; padding:.1rem; line-height:1; opacity:.55; }
+    .att-chip .x:hover{ opacity:1; }
+
+    .brgy-logo{ width:56px; height:56px; object-fit:contain; border-radius:50%; border:2px solid #ffd100; box-shadow:0 2px 4px rgba(0,0,0,.06); }
+    @media (min-width:992px){ .brgy-logo{ width:64px; height:64px; } }
+
+    .kp17-box{ border:1px solid rgba(0,0,0,.06); background:#fffdf9; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:none; }
+
+    .redirect-overlay{ position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(135deg, rgba(123,30,34,.9), rgba(252,151,0,.8)); z-index:9999; display:none; align-items:center; justify-content:center; }
+    .redirect-message{ background:#fff; padding:2.5rem; border-radius:16px; text-align:center; box-shadow:0 20px 40px rgba(0,0,0,.3); border:3px solid #ffd100; }
+    .redirect-spinner{ color:#7B1E22!important; width:3rem; height:3rem; }
+    .redirect-title{ color:#7B1E22; font-weight:700; }
+    .redirect-text{ color:#FC9700; }
+  </style>
+</head>
+
+<body>
+<div class="page-wrap">
+  <!-- Header -->
+  <div class="hero mb-3 d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="brgy-logo">
+      <div>
+        <div class="eyebrow" style="color:#FC9700; letter-spacing:.42em; text-transform:uppercase;">BARANGAY SEÑOR SANTO NIÑO</div>
+        <h4 class="title mb-1" style="color:#7B1E22;">LUPONG TAGAPAMAYAPA</h4>
+        <div class="d-flex flex-wrap align-items-center gap-2 subtle" style="margin-top:10px;">
+          {% if header and header.0 %}
+            <span class="badge-code">{{ header.0 }}</span>
+          {% else %}
+            <span class="badge-code">KP-{{ form_id }}</span>
+          {% endif %}
+
+          <span>— {{ header.2|default:header.1 }}</span>
+          {% if submission_id %}
+            <span class="ms-1">Editing submission
+              <span class="badge-code"><span class="hash">#</span>{{ submission_id }}</span>
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-link-compact">
+        <i class="bi bi-arrow-left me-1"></i> Back to Case
+      </a>
+    </div>
+  </div>
+
+  <!-- Builder card -->
+  <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2"><i class="bi bi-ui-checks-grid text-warning"></i><strong>Fill out fields</strong></div>
+      <div class="small subtle">Case <span class="badge-code"><span class="hash">#</span>{{ case_id }}</span></div>
+    </div>
+
+    <div class="card-body">
+
+      {% if kp8_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i><strong>Please set the Hearing Date and the Hearing Time</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp10_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-week" style="font-size:1.1rem;"></i><strong>Set the Hearing Details, Time, and Addressed To</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 10</strong>, choose the <strong>Hearing Details (date)</strong>, the <strong>Hearing Time</strong>, and search a person for <strong>Addressed To</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp11_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-people" style="font-size:1.1rem;"></i><strong>Select the Pangkat Member</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 11</strong>, search and pick the <strong>Pangkat Member Name</strong>. Other fields are auto-filled.</div>
+      </div>
+      {% endif %}
+
+      {% if kp12_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-clock-history" style="font-size:1.1rem;"></i><strong>Fill only the Created Day and Time</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 12</strong>, just set <strong>Date Created (day)</strong> and <strong>Time Created</strong>. Other fields are auto-filled.</div>
+      </div>
+      {% endif %}
+
+      {% if kp13_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-send-check" style="font-size:1.1rem;"></i><strong>Fill only: Subpoena To, Witness, Appearance Date &amp; Time</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 13</strong>, only these four fields are required and shown.</div>
+      </div>
+      {% endif %}
+
+      {% if kp14_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-text" style="font-size:1.1rem;"></i><strong>Everything is already filled.</strong></div>
+        <div class="mt-1" style="opacity:.95">Click <strong>Submit &amp; Generate PDF</strong> to create the <strong>Agreement for Arbitration</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp15_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-award" style="font-size:1.1rem;"></i><strong>Fill only the Award Description</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 15</strong>, only the <strong>Award Description</strong> field is editable. All other fields are pre-filled and readonly.</div>
+      </div>
+      {% endif %}
+
+      {% if kp16_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-text" style="font-size:1.1rem;"></i><strong>Settlement Agreement Documentation</strong></div>
+        <div class="mt-1" style="opacity:.95">Please provide the <strong>Settlement Statement</strong> detailing the terms and conditions agreed upon by both parties. All case information has been automatically populated from the records.</div>
+      </div>
+      {% endif %}
+
+      {% if kp18_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar-event" style="font-size:1.1rem;"></i><strong>Notice of Hearing</strong></div>
+        <div class="mt-1" style="opacity:.95">Set the <strong>Notice Date</strong> and <strong>Notice Time</strong> for the hearing notification. Case details are automatically filled from previous forms and cannot be modified.</div>
+      </div>
+      {% endif %}
+
+      {% if kp19_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle" style="font-size:1.1rem;"></i><strong>Failure to Appear</strong></div>
+        <div class="mt-1" style="opacity:.95">Set the <strong>Appearance Date</strong> and <strong>Appearance Time</strong> for the failed hearing. Case details are automatically filled from previous forms and cannot be modified.</div>
+      </div>
+      {% endif %}
+
+      {% if kp20_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-check" style="font-size:1.1rem;"></i><strong>Certification to File Action</strong></div>
+        <div class="mt-1" style="opacity:.95">All information has been automatically filled and recorded from previous forms. Simply review the details and <strong>Submit & Generate PDF</strong> to create the certification document.</div>
+      </div>
+      {% endif %}
+
+      {% if kp20a_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-check" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO FILE ACTION</strong></div>
+        <div class="mt-1" style="opacity:.95"><strong>THIS IS TO CERTIFY THAT:</strong><br>
+        1. There has been a personal confrontation between the parties before the Punong Barangay but mediation failed;<br>
+        2. The Pangkat ng Tagapagkasundo was constituted but the personal confrontation before the Pangkat likewise did not result into a settlement;<br>
+        3. Therefore, the corresponding complaint for the dispute may now be filed in court/government office.<br><br>
+        All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp20b_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-check" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO FILE ACTION</strong></div>
+        <div class="mt-1" style="opacity:.95"><strong>THIS IS TO CERTIFY THAT:</strong><br>
+        1. Parties were called for mediation of the complaint but the mediation proceeding did not result to any amicable settlement;<br>
+        2. The Punong Barangay set the meeting of the parties for the constitution of the Pangkat;<br>
+        3. The respondent willfully failed or refused to appear without justifiable reason at the conciliation proceedings before the Pangkat; and<br>
+        4. Therefore, the corresponding complaint for the dispute may now be filed in court/government office.<br><br>
+        All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp21_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-x" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO BAR ACTION (Complainant)</strong></div>
+        <div class="mt-1" style="opacity:.95">This is to certify that the above-captioned case was dismissed in favor of the complainant/s.<br><br>
+        All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp22_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-x" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO BAR ACTION (Respondent)</strong></div>
+        This is to certify that the above-captioned case was dismissed in favor of the respondent/s.<br><br>
+        All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp23_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-plus" style="font-size:1.1rem;"></i><strong>MOTION FOR EXECUTION</strong></div>
+        <div class="mt-1" style="opacity:.95">This form requests the execution of a settlement agreement or arbitration award. All case information has been automatically populated from previous forms and cannot be modified. Simply review the details and <strong>Submit & Generate PDF</strong>.</div>
+      </div>
+      {% endif %}
+
+      {% if kp24_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar-check" style="font-size:1.1rem;"></i><strong>NOTICE OF EXECUTION OF AWARD</strong></div>
+        <div class="mt-1" style="opacity:.95">This form notifies parties about the execution of an arbitration award. Case information is automatically populated from previous forms. Only set the <strong>Motion Date</strong> and <strong>Motion Time</strong> for when the execution will take place.</div>
+      </div>
+      {% endif %}
+
+      {# NEW: KP-9-P2 helper banner (Officer’s Return) #}
+      {% if header.0 == 'KP-9-P2' %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-clipboard-check" style="font-size:1.1rem;"></i>
+          <strong>Officer’s Return helper</strong>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          Search names for <strong>Served To</strong>, <strong>Respondent/s</strong>, <strong>Proxy Name(s)</strong>, and the <strong>Officer Name</strong>.
+          Pick a <strong>Mode of Service (1–4)</strong> and we’ll write the narrative for you.
+        </div>
+      </div>
+      {% endif %}
+
+      {% with title=header.2|default:header.1 %}
+      {% if title and 'ATTENDANCE' in title|upper %}
+      <div class="mb-3">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="fw-semibold d-flex align-items-center"><i class="bi bi-people me-2 text-warning"></i>Mediation attendees</div>
+            <div id="attChips" class="att-chips mt-2"></div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-brand d-flex align-items-center" id="btnAddStaff">
+              <i class="bi bi-person-plus me-2"></i> Add staff
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearStaff" title="Clear picks">Clear</button>
+          </div>
+        </div>
+        <input type="hidden" id="med_att_staff_json" name="med_att_staff_json" value="[]">
+        <div class="form-text mt-1">Picks auto-fill Attendee/Position/Contact fields (1..N). You can still edit them after.</div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- KP-17 ONLY -->
+      <div id="kp17RepudiationCapture" class="kp17-box" hidden>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-shield-exclamation text-warning"></i>
+          <strong>KP-17 Repudiation</strong>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label fw-bold mb-2">Who is repudiating? <span class="text-danger">*</span></label>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="repudiating_party" id="repC" value="COMPLAINANT">
+                <label class="form-check-label" for="repC">Complainant</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="repudiating_party" id="repR" value="RESPONDENT">
+                <label class="form-check-label" for="repR">Respondent</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-bold" for="repudiating_person_id">Select person <span class="text-danger">*</span></label>
+            <select class="form-select" id="repudiating_person_id"></select>
+            <div class="form-text">Pick the exact filer from the chosen side.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KP-23 ONLY -->
+      <div id="kp23FilerCapture" class="kp17-box" hidden>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-person-check text-warning"></i>
+          <strong>KP-23: Who filed?</strong>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label fw-bold mb-2">Filed by <span class="text-danger">*</span></label>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp23_filed_by_party" id="kp23C" value="COMPLAINANT">
+                <label class="form-check-label" for="kp23C">Complainant</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp23_filed_by_party" id="kp23R" value="RESPONDENT">
+                <label class="form-check-label" for="kp23R">Respondent</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-bold" for="kp23_filed_by_person_id">Select person <span class="text-danger">*</span></label>
+            <select class="form-select" id="kp23_filed_by_person_id"></select>
+            <div class="form-text">Pick the exact filer from the chosen side.</div>
+          </div>
+        </div>
+      </div>
+
+      {# NEW: KP-9-P2 Mode of Service (1–4) helper block #}
+      {% if header.0 == 'KP-9-P2' %}
+      <div id="kp9p2ModeBox" class="kp17-box" style="display:block;">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-list-ol text-warning"></i>
+          <strong>Mode of Service</strong>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m1" value="1">
+                <label class="form-check-label" for="kp9p2_m1">1) Handing to respondent (personal)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m2" value="2">
+                <label class="form-check-label" for="kp9p2_m2">2) Tendered; refused to receive</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m3" value="3">
+                <label class="form-check-label" for="kp9p2_m3">3) Left at dwelling with (Name)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m4" value="4">
+                <label class="form-check-label" for="kp9p2_m4">4) Left at office/place of business with (Name)</label>
+              </div>
+            </div>
+            <div class="form-text text-muted mt-1">
+              We’ll fill the “Officer’s Return (Narrative)” and show the right “Proxy Name” field.
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <form id="formFields" class="needs-validation" novalidate autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="case_id" value="{{ case_id }}">
+        <input type="hidden" name="form_id" value="{{ form_id }}">
+        {% if submission_id %}<input type="hidden" name="submission_id" value="{{ submission_id }}">{% endif %}
+
+        <div class="row g-3">
+          {% with 1 as page %}
+          {% for kff_id, field_id, label, type_name, is_required, value, field_code in fields %}
+            {% with field_code|lower as code %}
+              {% if type_name == "TEXTAREA" %}
+                <div class="col-12
+                  {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'served_to' in code and code != 'served_to' %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'offcr_ret' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}
+                  {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
+                  {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
+                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' %} kp-offscreen{% endif %}
+                  {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp14_ui_minimal %} kp-offscreen{% endif %}
+                  {% if kp16_ui_minimal and code != 'settlement_statement' %} kp-offscreen{% endif %}
+                  {% if kp17_ui_minimal and field_id != 665 and field_id != 839 and field_id != 903 and field_id != 685 and field_id != 766 and field_id != 757 %} kp-offscreen{% endif %}
+                  {% if kp18_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'notice_date' and code != 'notice_time' %} kp-offscreen{% endif %}
+                  {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp20_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp20a_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_number' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp20b_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp21_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp22_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}">
+              {% else %}
+                <div class="col-12 col-md-6
+                  {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'served_to' in code and code != 'served_to' %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'offcr_ret' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer Return' in label and 'Month' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer Return' in label and 'Year' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Served' in label and 'Day' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Served' in label and 'Month' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Served' in label and 'Year' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Date Signed' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Processed' in label %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}
+                  {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
+                  {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
+                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' %} kp-offscreen{% endif %}
+                  {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp14_ui_minimal %} kp-offscreen{% endif %}
+                  {% if kp16_ui_minimal and code != 'settlement_statement' %} kp-offscreen{% endif %}
+                  {% if kp17_ui_minimal and field_id != 665 and field_id != 839 and field_id != 903 and field_id != 685 and field_id != 766 and field_id != 757 %} kp-offscreen{% endif %}
+                  {% if kp18_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'notice_date' and code != 'notice_time' %} kp-offscreen{% endif %}
+                  {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp20_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp20a_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_number' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp20b_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp21_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp22_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
+                  {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}">
+              {% endif %}
+                <div class="kp-field" data-code="{{ code }}">
+                  <label class="form-label
+                    {% if is_required %}
+                      {% if kp8_ui_minimal %}
+                        {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %} label-req {% endif %}
+                      {% elif kp10_ui_minimal %}
+                        {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %} label-req {% endif %}
+                      {% elif kp11_ui_minimal %}
+                        {% if code == 'pangkat_member_name' %} label-req {% endif %}
+                      {% elif kp12_ui_minimal %}
+                        {% if code == 'date_created' or code == 'time_created' %} label-req {% endif %}
+                      {% elif kp13_ui_minimal %}
+                        {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %} label-req {% endif %}
+                      {% elif kp16_ui_minimal %}
+                        {% if code == 'settlement_statement' %} label-req {% endif %}
+                      {% elif kp18_ui_minimal %}
+                        {% if code == 'notice_date' or code == 'notice_time' %} label-req {% endif %}
+                      {% elif kp19_ui_minimal %}
+                        {% if code == 'appearance_date' or code == 'appearance_time' %} label-req {% endif %}
+                      {% elif kp24_ui_minimal %}
+                        {% if code == 'motion_date' or code == 'motion_time' %} label-req {% endif %}
+                      {% else %}
+                        label-req
+                      {% endif %}
+                    {% endif %}"
+                    for="f_{{ field_id }}">{{ label }}</label>
+
+                  {% if type_name == "TEXT" %}
+                    <input id="f_{{ field_id }}" type="text" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if kp18_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
+                           {% if kp19_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
+                           {% if kp20_ui_minimal %}readonly{% endif %}
+                           {% if kp20a_ui_minimal %}readonly{% endif %}
+                           {% if kp20b_ui_minimal %}readonly{% endif %}
+                           {% if kp21_ui_minimal %}readonly{% endif %}
+                           {% if kp22_ui_minimal %}readonly{% endif %}
+                           {% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}
+                           {% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "EMAIL" %}
+                    <input id="f_{{ field_id }}" type="email" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "PHONE" %}
+                    <input id="f_{{ field_id }}" type="tel" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}" placeholder="09XXXXXXXXX"
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "NUMBER" %}
+                    <input id="f_{{ field_id }}" type="number" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "DATE" %}
+                    <input id="f_{{ field_id }}" type="date" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "TIME" %}
+                    <input id="f_{{ field_id }}" type="time" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "CHECKBOX" %}
+                    <input id="f_{{ field_id }}" type="checkbox" class="form-check-input ms-1"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           {% if value %}checked{% endif %}
+                           {% if is_required %}required{% endif %}>
+                  {% elif type_name == "CURRENCY" %}
+                    <div class="input-group">
+                      <span class="input-group-text">₱</span>
+                      <input id="f_{{ field_id }}" type="number" step="0.01" class="form-control"
+                             data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                             value="{{ value|default:'' }}"
+                             {% if is_required %}required{% endif %}>
+                    </div>
+                  {% elif type_name == "TEXTAREA" %}
+                    <textarea id="f_{{ field_id }}" class="form-control" rows="4"
+                              data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                              {% if kp18_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
+                              {% if kp19_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
+                              {% if kp20_ui_minimal %}readonly{% endif %}
+                              {% if kp20a_ui_minimal %}readonly{% endif %}
+                              {% if kp20b_ui_minimal %}readonly{% endif %}
+                              {% if kp21_ui_minimal %}readonly{% endif %}
+                              {% if kp22_ui_minimal %}readonly{% endif %}
+                              {% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}
+                              {% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}
+                              {% if is_required %}required{% endif %}>{{ value|default:'' }}</textarea>
+                  {% else %}
+                    <input id="f_{{ field_id }}" type="text" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}required{% endif %}>
+                    <div class="form-text">Unsupported type <code>{{ type_name }}</code> (rendered as text)</div>
+                  {% endif %}
+                  <div class="invalid-feedback">This field is required.</div>
+                </div>
+              </div>
+            {% endwith %}
+          {% endfor %}
+          {% endwith %}
+        </div>
+      </form>
+    </div>
+
+    <div class="sticky-actions">
+      <div class="hint"><i class="bi bi-info-circle me-1"></i> Please ensure that all information and fields have been thoroughly reviewed and verified.</div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand"><i class="bi bi-x-circle me-1"></i> Cancel</a>
+        <!-- <button id="saveBtn" class="btn btn-outline-brand">
+          <span class="when-idle"><i class="bi bi-cloud-arrow-up me-1"></i> Save Draft</span>
+          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Saving…</span>
+        </button> -->
+        <button id="submitBtn" class="btn btn-brand">
+          <span class="when-idle"><i class="bi bi-check2-square me-1"></i> Submit &amp; Generate PDF</span>
+          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Submitting…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+  <div id="toastOk" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body"><i class="bi bi-check2-circle me-1"></i><span class="msg">Saved.</span></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+  <div id="toastWarn" class="toast align-items-center text-bg-danger border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body"><i class="bi bi-exclamation-octagon me-1"></i><span class="msg">Something went wrong.</span></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Submit modal -->
+<div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title d-flex align-items-center"><i class="bi bi-file-check me-2 text-warning"></i> Confirm Submit &amp; Generate PDF</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">We’ll save your latest answers, submit this form, and generate the PDF.</p>
+        <ul class="small text-muted mb-0">
+          <li>We’ll open the PDF in a new tab.</li>
+          <li>Then you’ll be taken back to the correct case page.</li>
+        </ul>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle me-1"></i> Cancel</button>
+        <button type="button" id="confirmSubmitBtn" class="btn btn-brand">
+          <span class="when-idle"><i class="bi bi-check2-square me-1"></i> Yes, Submit</span>
+          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Submitting…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Staff picker modal -->
+<div class="modal" tabindex="-1" id="staffPicker" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add staff attendee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group mb-2">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" id="staffSearch" placeholder="Search staff by name…">
+        </div>
+        <div id="staffResults" class="list-group"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Redirect loading overlay -->
+<div id="redirectOverlay" class="redirect-overlay">
+  <div class="redirect-message">
+    <div class="spinner-border redirect-spinner mb-3" role="status"></div>
+    <h5 class="redirect-title mb-2">Redirecting...</h5>
+    <p class="redirect-text mb-0">Taking you back to the previous page</p>
+  </div>
+</div>
+
+<!-- Runtime config for the external JS -->
+<script id="fb-config" type="application/json">
+{
+  "form_id": {{ form_id|default:"0" }},
+  "form_code": "{{ header.0|default:form_code }}",
+  "case_id": {{ case_id }},
+  "submission_id": {% if submission_id %}{{ submission_id }}{% else %}null{% endif %},
+  "flags": {
+    "kp8_ui_minimal": {{ kp8_ui_minimal|yesno:"true,false" }},
+    "kp10_ui_minimal": {{ kp10_ui_minimal|yesno:"true,false" }},
+    "kp11_ui_minimal": {{ kp11_ui_minimal|yesno:"true,false" }},
+    "kp12_ui_minimal": {{ kp12_ui_minimal|yesno:"true,false" }},
+    "kp13_ui_minimal": {{ kp13_ui_minimal|yesno:"true,false" }},
+    "kp14_ui_minimal": {{ kp14_ui_minimal|yesno:"true,false" }},
+    "kp15_ui_minimal": {{ kp15_ui_minimal|yesno:"true,false" }},
+    "kp16_ui_minimal": {{ kp16_ui_minimal|yesno:"true,false" }},
+    "kp23_ui_minimal": {{ kp23_ui_minimal|yesno:"true,false" }},
+    "kp18_ui_minimal": {{ kp18_ui_minimal|yesno:"true,false" }},
+    "kp19_ui_minimal": {{ kp19_ui_minimal|yesno:"true,false" }},
+    "kp20_ui_minimal": {{ kp20_ui_minimal|yesno:"true,false" }},
+    "kp20a_ui_minimal": {{ kp20a_ui_minimal|yesno:"true,false" }},
+    "kp20b_ui_minimal": {{ kp20b_ui_minimal|yesno:"true,false" }},
+    "kp21_ui_minimal": {{ kp21_ui_minimal|yesno:"true,false" }},
+    "kp22_ui_minimal": {{ kp22_ui_minimal|yesno:"true,false" }},
+    "kp23_ui_minimal": {{ kp23_ui_minimal|yesno:"true,false" }},
+    "kp24_ui_minimal": {{ kp24_ui_minimal|yesno:"true,false" }},
+    "kp20a_ui_minimal": {{ kp20a_ui_minimal|yesno:"true,false" }}
+  },
+  "urls": {
+    "save_answers": "{% url 'lupon_mem:save_answers' %}",
+    "submit_form": "{% url 'lupon_mem:submit_form' %}",
+    "staff_suggest": "{% url 'lupon_mem:staff_suggest' %}",
+    "person_suggest": "{% url 'lupon_mem:person_suggest' %}",
+    "staff_suggest_all": "{% url 'lupon_mem:staff_suggest_all' %}",
+    "case_detail": "{% url 'lupon_mem:case_detail' case_id %}"
+  },
+  "parties": {
+    "complainants": {% if complainants %}{{ complainants|safe }}{% else %}[] {% endif %},
+    "respondents": {% if respondents %}{{ respondents|safe }}{% else %}[] {% endif %}
+  }
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Your existing JS file; untouched -->
+<script src="{% static 'js/form_builder.js' %}"></script>
+</body>
+</html>

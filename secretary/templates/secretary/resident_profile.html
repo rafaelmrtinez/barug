@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <a href="{% url 'secretary:residents_list' %}" class="btn btn-link ps-0 mb-2">&larr; Back to list</a>
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <div class="text-uppercase small text-muted">Barangay Secretary</div>
+      <h1 class="h4 fw-bold mb-0">Resident Profile</h1>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="small text-muted">Full name</div>
+          <div class="fw-semibold">{{ profile.first_name }} {{ profile.middle_name }} {{ profile.last_name }} {{ profile.suffix }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="small text-muted">Person Code</div>
+          <div class="fw-semibold">{{ profile.person_code }}</div>
+        </div>
+        <div class="col-md-12">
+          <div class="small text-muted">Address</div>
+          <div class="fw-semibold">
+            {{ profile.street }}, {{ profile.purok_sitio_name }}, {{ profile.barangay }}, {{ profile.city }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

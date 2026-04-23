@@ -1,0 +1,32 @@
+/* Button */
+.btn {
+    font-weight: 500;
+}
+
+.btn-submit,
+.btn-icon {
+    padding-inline: 20px;
+    border-radius: 18px;
+    background-color: var(--bs-danger-text-emphasis);
+    color: var(--bs-white);
+    border: 2px solid var(--bs-danger-text-emphasis);
+}
+
+.btn-submit:hover,
+.btn-reset:hover,
+.btn-icon:hover {
+    border: 2px solid var(--bs-danger-text-emphasis);
+    color: black;
+}
+
+.btn-reset {
+    padding-inline: 20px;
+    border-radius: 18px;
+    border: 2px solid transparent;
+}
+
+.button-container {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}

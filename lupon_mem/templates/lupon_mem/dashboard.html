@@ -1,0 +1,468 @@
+{% extends "base.html" %} 
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<style>
+/* ───────── Theme (BARUG maroon) ───────── */
+.dashboard.theme-barug{
+  --brand-900:#3a1217;
+  --brand-800:#561c24;
+  --brand-700:#6d2932;  /* primary */
+  --brand-600:#6d2932;
+  --brand-500:#561c24;
+  --brand-400:#c7b7a3;
+  --brand-300:#e8d8c4;  /* area fill */
+  --brand-200:#f3ece3;
+  --brand-100:#fbf7f4;
+
+  --neutral-800:#1f2937;
+  --neutral-600:#4b5563;
+  --neutral-500:#6b7280; /* axis text */
+  --neutral-400:#9ca3af;
+  --neutral-300:#d1d5db; /* grid */
+  --neutral-200:#e5e7eb;
+  --neutral-100:#f3f4f6;
+
+  --surface:#ffffff;
+  --surface-muted:#faf9f7;
+  --border:#ece7e1;
+  --shadow:0 8px 24px rgba(15,23,42,.06);
+}
+
+/* ───────── Base / perf ───────── */
+.dashboard .card{ border-radius:16px; border:1px solid var(--border); }
+.dashboard .shadow-sm{ box-shadow:var(--shadow)!important; }
+.dashboard .btn,.dashboard .form-select,.dashboard .form-control{ border-radius:12px; }
+.header-card,.kpi{ content-visibility:auto; contain-intrinsic-size:300px 400px; }
+.section.chart-section{ content-visibility:visible; }
+
+/* Header */
+.header-card{ background:linear-gradient(135deg,var(--brand-100),#fff); }
+.eyebrow{ letter-spacing:.12em; font-size:.72rem; color:var(--brand-700); }
+
+/* Buttons */
+.btn-brand{ background:var(--brand-700); color:#fff; border:1px solid var(--brand-700); }
+.btn-brand:hover{ background:var(--brand-800); color:#fff; }
+.btn-outline-brand{ color:var(--brand-700); border:1px solid var(--brand-700); background:transparent; }
+.btn-outline-brand:hover{ background:var(--brand-100); color:var(--brand-800); }
+.btn-brand-subtle{ background:var(--brand-300); color:var(--brand-800); border:1px solid var(--brand-300); }
+.btn-brand-subtle:hover{ background:var(--brand-200); }
+
+/* Links */
+.link-brand{ color:var(--brand-700); text-decoration:none; }
+.link-brand:hover{ color:var(--brand-800); text-decoration:underline; }
+
+/* KPI */
+.kpi .kpi-icon{
+  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
+  background:var(--brand-300); color:var(--brand-700);
+}
+.kpi .kpi-label{ font-size:.82rem; color:var(--neutral-600); font-weight:600; }
+.kpi .kpi-value{ font-size:2rem; font-weight:800; line-height:1; }
+.kpi .kpi-sub{ font-size:.8rem; font-weight:700; }
+.kpi .kpi-pill{ background:var(--brand-200); color:var(--brand-800); border:1px solid var(--brand-300); }
+
+/* Sections */
+.section .card-header{ background:var(--surface-muted); border-bottom:1px solid var(--border); padding:.85rem 1rem; }
+
+/* Lists */
+.panel-list{ max-height:360px; overflow:auto; }
+.item-row + .item-row{ border-top:1px dashed var(--border); }
+.item-row{ padding:.75rem 0; }
+
+/* Status badges */
+.status-badge{ font-weight:700; }
+.status-pending{ background:var(--brand-200); color:var(--brand-800); }
+.status-processing{ background:#fff7e6; color:#b96b00; }
+.status-approved{ background:#e9f7ef; color:#0a7f3f; }
+.status-rejected{ background:#fdecea; color:#b22d2d; }
+
+/* Charts */
+.chart-wrap{
+  position:relative;
+  height:clamp(320px, 40vh, 520px); /* Bigger and responsive */
+}
+.chart-wrap canvas{
+  width:100% !important;
+  height:100% !important;
+  display:block;
+}
+
+/* Legend for Barangay Cases Status Breakdown */
+#statusLegend.legend-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+#statusLegend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+#statusLegend .legend-dot {
+  width: .9rem;
+  height: .9rem;
+  border-radius: 50%;
+  background: var(--dot, var(--brand-600));
+  flex-shrink: 0;
+}
+
+#statusLegend .legend-label {
+  font-size: .625rem;
+  color: var(--neutral-600);
+  white-space: nowrap;
+}
+
+/* Skeletons */
+.skeleton{ position:absolute; inset:0; border-radius:12px; overflow:hidden; background:var(--neutral-200); }
+.skeleton::after{ content:""; position:absolute; inset:0; transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);
+  animation:shimmer 1.1s infinite; }
+@keyframes shimmer{ to{ transform:translateX(100%);} }
+.hidden{ display:none!important; }
+
+/* Tables */
+.table thead th{ font-weight:700; }
+.table > :not(caption) > * > *{ padding:.95rem 1rem; }
+
+/* Motion */
+.lift-on-hover{ transition:transform .18s ease, box-shadow .18s ease; }
+.lift-on-hover:hover{ transform:translateY(-2px); box-shadow:0 10px 28px rgba(15,23,42,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard theme-barug container-fluid py-4" style="margin-top:40px;">
+
+  <!-- Page Header -->
+  <div class="row g-3 align-items-center mb-3">
+    <div class="col-12">
+      <div class="card header-card shadow-sm">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <div class="eyebrow text-uppercase">Barangay Lupon Member</div>
+            <h1 class="h4 mb-0 fw-bold">Overview</h1>
+            <div class="text-muted small mt-1">{{ today|default:"" }}</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'lupon_mem:blotter_reports_menu' %}" class="btn btn-outline-brand">
+              {% bs_icon 'shield-check' %}<span class="ms-1">Blotter Reports</span>
+            </a>
+            <a href="{% url 'lupon_mem:case_list' %}" class="btn btn-brand">
+              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Barangay Cases</span>
+            </a>
+            <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-brand-subtle">
+              {% bs_icon 'buildings' %}<span class="ms-1">Resident Records</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'file-text' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Barangay Cases</div>
+            <div class="kpi-value" id="kpiOpenCases" title="Ongoing lupon cases.">{{ kpis.ongoing_cases|default_if_none:"-" }} <span class="kpi-sub">Ongoing Cases</span></div>
+            <div class="kpi-sub" id="kpiOpenCasesDelta" title="Open lupon cases.">{{ kpis.open_cases|default_if_none:"-" }} Open Cases</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'file-earmark-medical' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Settled Cases</div>
+            <div class="kpi-value">{{ kpis.total_case_settled|default_if_none:"-" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'file-earmark-break' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Unsettled Cases</div>
+            <div class="kpi-value">{{ kpis.total_case_unsettled|default_if_none:"-" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'percent' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Settlement Percentage</div>
+            <div class="kpi-value">{{ kpis.settlement_rate|default_if_none:"-" }}<span class="kpi-sub">%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Reports Section -->
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="card section shadow-sm">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Quick Reports</h5>
+          <a href="{% url 'lupon_mem:blotter_reports_menu' %}" class="btn btn-sm btn-outline-brand">View All Reports</a>
+        </div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <button class="btn btn-outline-primary btn-sm w-100" onclick="showFilterModal('total_cases_by_status')">
+                <i class="bi bi-bar-chart me-1"></i> Cases by Status
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-success btn-sm w-100" onclick="showFilterModal('case_summaries')">
+                <i class="bi bi-file-text me-1"></i> Case Summaries
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-secondary btn-sm w-100" onclick="showFilterModal('incident_by_location')">
+                <i class="bi bi-geo-alt me-1"></i> Incident by Location
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-info btn-sm w-100" onclick="showFilterModal('monthly_activity')">
+                <i class="bi bi-calendar-month me-1"></i> Monthly Activity
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Announcements Section -->
+<div class="row g-3 mt-3">
+  <div class="col-12">
+    {% include 'announcement/in_app_announcement.html' %}
+  </div>
+</div>
+
+  <!-- Charts -->
+  <div class="row g-3 mt-1">
+    <div class="col-6">
+      <div class="card section chart-section shadow-sm h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Case Nature Distribution</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap">
+            <canvas id="casesNature"></canvas>
+            <div class="skeleton chart-skel-cases"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6">
+      <div class="card section chart-section shadow-sm h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Barangay Cases Status Breakdown</h5>
+        </div>
+        <div class="card-body d-flex align-items-center" style="gap:1.5rem;">
+          <div id="statusLegend" class="legend-vertical me-2"></div>
+          <div class="chart-wrap flex-grow-1">
+            <canvas id="settlementStatus"></canvas>
+            <div class="skeleton chart-skel-setstatus"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if dashboard_json %}
+    {{ dashboard_json|json_script:"dash-data" }}
+  {% endif %}
+
+<script src="{% static 'js/dashboard-charts.js' %}"></script>
+<script>
+  (function(){
+    const dashEl = document.getElementById('dash-data');
+    const parsed = dashEl ? JSON.parse(dashEl.textContent) : null;
+    ChartUtils.renderDashboardFromJSON(parsed || {});
+
+    // Manually populate legend with colors from settlementStatus
+    const statusLegend = document.getElementById('statusLegend');
+    if (statusLegend && parsed?.settlementStatus) {
+      const labels = parsed.settlementStatus.labels || [];
+      const colors = parsed.settlementStatus.colors || [];
+      statusLegend.innerHTML = '';
+      labels.forEach((label, idx) => {
+        const div = document.createElement('div');
+        div.className = 'legend-item';
+        const dot = document.createElement('span');
+        dot.className = 'legend-dot';
+        dot.style.backgroundColor = colors[idx] || '#34495e';
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'legend-label';
+        labelSpan.textContent = label;
+        div.appendChild(dot);
+        div.appendChild(labelSpan);
+        statusLegend.appendChild(div);
+      });
+    }
+  })();
+
+  function showFilterModal(reportType) {
+    const form = document.getElementById('filterForm');
+    const monthYearFilters = document.getElementById('monthYearFilters');
+    const otherFilters = document.getElementById('otherFilters');
+    const dateFilters = document.getElementById('dateFilters');
+    
+    form.method = 'post';
+    
+    if (reportType === 'case_summaries' || reportType === 'total_cases_by_status' || reportType === 'blotter_reports_summary' || reportType === 'monthly_activity') {
+        monthYearFilters.style.display = 'flex';
+        otherFilters.style.display = 'none';
+        dateFilters.style.display = 'none';
+        monthYearFilters.querySelectorAll('select').forEach(s => s.required = true);
+        
+        // Set default to current month and year
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        
+        const monthSelect = monthYearFilters.querySelector('select[name="month"]');
+        const yearSelect = monthYearFilters.querySelector('select[name="year"]');
+        
+        // Populate year dropdown dynamically
+        if (yearSelect.options.length <= 1) {
+            const startYear = 2020;
+            const endYear = currentYear + 2;
+            for (let year = startYear; year <= endYear; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            }
+        }
+        
+        if (monthSelect) monthSelect.value = currentMonth;
+        if (yearSelect) yearSelect.value = currentYear;
+    } else {
+        monthYearFilters.style.display = 'none';
+        otherFilters.style.display = 'flex';
+        dateFilters.style.display = 'flex';
+        monthYearFilters.querySelectorAll('select').forEach(s => s.required = false);
+    }
+    
+    form.action = `/lupon_mem/blotter-reports/${reportType}/`;
+    new bootstrap.Modal(document.getElementById('filterModal')).show();
+  }
+</script>
+
+</div>
+
+<!-- Filter Modal -->
+<div class="modal fade" id="filterModal" tabindex="-1" style="margin-top: 100px;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: #3a1217;">
+                <h5 class="modal-title"><i class="bi bi-funnel me-2"></i>Report Filters</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="filterForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row" id="monthYearFilters" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-calendar-month me-1"></i>Month</label>
+                                <select class="form-select" name="month" required>
+                                    <option value="">Select Month</option>
+                                    <option value="1">January</option>
+                                    <option value="2">February</option>
+                                    <option value="3">March</option>
+                                    <option value="4">April</option>
+                                    <option value="5">May</option>
+                                    <option value="6">June</option>
+                                    <option value="7">July</option>
+                                    <option value="8">August</option>
+                                    <option value="9">September</option>
+                                    <option value="10">October</option>
+                                    <option value="11">November</option>
+                                    <option value="12">December</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-calendar-year me-1"></i>Year</label>
+                                <select class="form-select" name="year" id="yearSelect" required>
+                                    <option value="">Select Year</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="otherFilters">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-tag me-1"></i>Complaint Title <span class="text-muted">(Optional)</span></label>
+                                <select class="form-select" name="complaint_title_id">
+                                    <option value="">All Complaint Types</option>
+                                    {% for ct_id, ct_name in complaint_titles %}
+                                        <option value="{{ ct_id }}">{{ ct_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-file-text me-1"></i>Case Nature <span class="text-muted">(Optional)</span></label>
+                                <select class="form-select" name="case_nature_id">
+                                    <option value="">All Case Natures</option>
+                                    {% for cn_id, cn_name in case_natures %}
+                                        <option value="{{ cn_id }}">{{ cn_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="dateFilters">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-calendar-check me-1"></i>Date From <span class="text-muted">(Optional)</span></label>
+                                <input type="date" class="form-control" name="date_from">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="form-label fw-bold"><i class="bi bi-calendar-x me-1"></i>Date To <span class="text-muted">(Optional)</span></label>
+                                <input type="date" class="form-control" name="date_to">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancel
+                    </button>
+                    <button type="submit"
+                            class="btn btn-primary"
+                            style="color:#3a1217; background-color:#f5c2c7; border-color:#f5c2c7;">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>Generate PDF
+                    </button>
+
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

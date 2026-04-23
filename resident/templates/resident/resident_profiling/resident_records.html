@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3" style="margin-top: 40px;">
+
+    <div class="row">
+
+        <div class="col-lg-12">
+
+            <div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Resident ID</th>
+                            <th scope="col">Full Name</th>
+                            <th scope="col">Home Address</th>
+                            <th scope="col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row-height">
+                            <td>RBSN00000</td>
+                            <td>Bellosillo, Raphael H.</td>
+                            <td>Legaspi Sto Nino</td>
+                            <td>
+                                <!-- RBSN00000 is only a sample -->
+                                <div>
+                                    <a class="btn btn-icon" href="{% url 'resident:resident_record' res_id='RBSN00000' %}">
+                                        {% bs_icon 'person-lines-fill' size='1em' %}
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No resident records found.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

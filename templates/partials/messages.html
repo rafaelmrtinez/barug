@@ -1,0 +1,80 @@
+{% load bootstrap_icons %}
+{% if messages %}
+
+<style>
+  /* Flash container spacing */
+  .flash-scope { margin-top: .75rem; }
+
+  /* Align content & close button nicely */
+  .flash-scope .alert {
+    display: flex;
+    align-items: center;        /* vertically center everything, incl. × */
+    gap: .5rem;
+    padding: .75rem 1rem;
+    margin-bottom: .75rem;
+  }
+  .flash-scope .btn-close {
+    margin-left: auto;          /* push to far right */
+    position: static;           /* override absolute positioning */
+    align-self: center;         /* ensure perfect vertical center */
+  }
+
+  /* Icon + text spacing */
+  .flash-icon { display: inline-flex; }
+  .flash-text { line-height: 1.25; }
+</style>
+
+<div class="flash-scope container px-3 pt-2">
+  {% for message in messages %}
+    {% with tag=message.tags|default:"info" %}
+      {% if tag == "success" %}
+        {% with cls="success" icon="check-circle-fill" %}
+          <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
+            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-text">{{ message }}</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endwith %}
+      {% elif tag == "warning" %}
+        {% with cls="warning" icon="exclamation-circle-fill" %}
+          <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
+            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-text">{{ message }}</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endwith %}
+      {% elif tag == "error" %}
+        {% with cls="danger" icon="exclamation-triangle-fill" %}
+          <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
+            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-text">{{ message }}</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endwith %}
+      {% else %}
+        {% with cls="info" icon="info-circle-fill" %}
+          <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
+            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-text">{{ message }}</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endwith %}
+      {% endif %}
+    {% endwith %}
+  {% endfor %}
+</div>
+
+<script>
+  // Auto-dismiss after 6s
+  setTimeout(() => {
+    document.querySelectorAll('.flash-scope .alert.fade.show')
+      .forEach(el => bootstrap.Alert.getOrCreateInstance(el).close());
+  }, 6000);
+
+  // Ensure the user sees messages immediately
+  if (document.querySelector('.flash-scope .alert')) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+
+{% endif %}
