@@ -1,10 +1,12 @@
 # lupon_mem/services/forms/kp9.py
 from __future__ import annotations
 from typing import Dict, Set, Optional, List
-from datetime import date as _date, datetime as _dt
+from datetime import date as _date, datetime as _dt, time as _time
 import json
 import logging
+import re
 
+from django.core.exceptions import ValidationError
 from django.db import connection
 from lupon_mem.services import form_shared as FS
 from lupon_mem.services import fields_util as FU  # use KP-8 getters
@@ -40,6 +42,7 @@ _KP9_SOURCES: Dict[str, Set[str]] = {
     "curr_date": {"curr_date", "current_date", "date_created", "this_date", "date"},
     "curr_month": {"curr_month", "current_month", "month_created"},
     "curr_year": {"curr_year", "current_year", "year_received", "year_created", "year"},
+    "processed_on_time": {"processed_on_time", "processed on (time)"},
     "brgy_capt": {"brgy_capt", "brgy_captain", "chairman", "punong_barangay"},
     "served_to": {"served_to"},
     "date_offcret": {"date_offcret"},
@@ -170,6 +173,34 @@ class KP9Handler:
 
 
     # ---------------- small utils ----------------
+
+    @staticmethod
+    def _format_processed_time(value) -> str:
+        """Use only the entered time; never substitute the current time."""
+        if value is None:
+            return ""
+        if isinstance(value, _dt):
+            value = value.time()
+        if isinstance(value, _time):
+            return value.strftime("%I:%M %p").lstrip("0")
+
+        raw = FS.sanitize_text(str(value)).strip()
+        if not raw or raw.lower() == "null":
+            return ""
+        raw = re.sub(r"\s+", " ", raw.lstrip("@").strip()).upper()
+        for fmt in (
+            "%H:%M", "%H:%M:%S", "%H:%M:%S.%f",
+            "%I:%M %p", "%I:%M%p", "%I:%M:%S %p", "%I:%M:%S%p",
+            "%I %p", "%I%p",
+        ):
+            try:
+                parsed = _dt.strptime(raw, fmt)
+                return parsed.strftime("%I:%M %p").lstrip("0")
+            except ValueError:
+                continue
+        raise ValidationError(
+            "Processed On (Time) must be a valid time, such as 12:00 PM or 14:30."
+        )
 
     @staticmethod
     def _try_parse_date(s: str):
@@ -379,6 +410,16 @@ class KP9Handler:
         self._normalize_triplet(out, "curr_date",   "curr_month",  "curr_year")
         self._normalize_triplet(out, "offcret_serve_date", "offcret_serve_month", "offcret_serve_year")
         self._normalize_triplet(out, "date_offcret",      "month_offcret",       "ofcret_year")
+
+        # The PDF's curr_year field holds the year and the entered processed time.
+        # Strip a previously saved @time so editing cannot duplicate or retain it.
+        processed_time = self._format_processed_time(out.get("processed_on_time"))
+        out["processed_on_time"] = processed_time
+        current_year = (out.get("curr_year") or "").split("@", 1)[0].strip()
+        if processed_time:
+            out["curr_year"] = f"{current_year} @{processed_time}".strip()
+        else:
+            out["curr_year"] = current_year
 
         # Final sanitize & ensure all fields exist
         for k, v in list(out.items()):

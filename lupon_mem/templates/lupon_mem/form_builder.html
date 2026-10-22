@@ -4,10 +4,8 @@
 <head>
   <meta charset="utf-8">
   <title>Form Builder</title>
-
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-
   <style>
     :root{
       --brand:#7B1E22; --brand-700:#6a1a1e; --accent:#D4AF37;
@@ -17,34 +15,27 @@
     }
     html, body { background: var(--bg); }
     .page-wrap { max-width:1120px; margin:0 auto; padding:1.25rem; }
-
     .hero { border-radius:16px; background:#fff; border:1px solid rgba(0,0,0,.06); padding:1rem 1.25rem; }
     .hero .title { font-weight:700; letter-spacing:.2px; margin:0; }
     .hero .eyebrow { text-transform:uppercase; font-size:.75rem; color:var(--muted); letter-spacing:.18rem; }
-
     .badge-code{ display:inline-flex; gap:.35rem; font:500 12px ui-monospace,Menlo,Consolas,monospace;
       padding:.35rem .55rem; border-radius:.5rem; background:#f7f4ef; color:var(--brand);
       border:1px solid rgba(0,0,0,.06); }
     .hash{ opacity:.65; }
-
     .card{ border:1px solid rgba(0,0,0,.06); border-radius:16px; background:var(--card);
       box-shadow:0 2px 8px rgba(0,0,0,.03), 0 1px 0 rgba(212,175,55,.12) inset; }
     .card .card-header{ background:#fff; border-bottom:1px solid rgba(0,0,0,.06); border-radius:16px 16px 0 0!important; padding:.9rem 1rem; }
     .card .card-body{ padding:1.1rem; }
-
     .form-label{ font-weight:600; color:var(--ink); }
     .label-req::after{ content:" *"; color:#dc3545; }
     .form-control, .input-group-text{ border-radius:.65rem; border-color:rgba(0,0,0,.12); }
     .form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 .2rem var(--ring); }
-
     .row.g-3 > [class*="col-"]{ scroll-margin-top:100px; }
-
     .sticky-actions{
       position:sticky; bottom:0; background:#fff; border-top:1px solid rgba(0,0,0,.06);
       padding:.8rem 1rem; display:flex; justify-content:space-between; gap:.75rem; border-radius:0 0 16px 16px;
     }
     .hint{ color:var(--muted); font-size:.9rem; }
-
     .btn-brand{
       --bs-btn-bg:var(--brand); --bs-btn-border-color:var(--brand);
       --bs-btn-hover-bg:var(--brand-700); --bs-btn-hover-border-color:var(--brand-700);
@@ -61,7 +52,6 @@
     .btn-link-compact{ border-radius:12px; border:1px solid rgba(0,0,0,.08); padding:.45rem .7rem; color:var(--ink); background:#fff; }
     .btn-link-compact:hover{ border-color:var(--brand); color:var(--brand); }
     .subtle{ color:var(--muted); }
-
     /* Typeahead */
     .typeahead-wrap{ position:relative; }
     .typeahead-dropdown{
@@ -79,19 +69,14 @@
     .typeahead-item{ padding:.55rem .75rem; font-size:.95rem; line-height:1.2; color:#1b1b1b; background:transparent; border:0; text-align:left; width:100%; }
     .typeahead-item:hover{ background:var(--dropdown-hover); }
     .typeahead-empty{ padding:.6rem .8rem; color:#666; font-size:.9rem; }
-
     .kp-offscreen{ position:absolute !important; left:-10000px !important; top:auto !important; width:1px !important; height:1px !important; overflow:hidden !important; }
-
     .att-chips{ display:flex; flex-wrap:wrap; gap:.4rem; }
     .att-chip{ display:inline-flex; align-items:center; gap:.35rem; border:1px solid rgba(0,0,0,.08); background:#fff; border-radius:999px; padding:.25rem .55rem; }
     .att-chip .x{ border:0; background:transparent; padding:.1rem; line-height:1; opacity:.55; }
     .att-chip .x:hover{ opacity:1; }
-
     .brgy-logo{ width:56px; height:56px; object-fit:contain; border-radius:50%; border:2px solid #ffd100; box-shadow:0 2px 4px rgba(0,0,0,.06); }
     @media (min-width:992px){ .brgy-logo{ width:64px; height:64px; } }
-
     .kp17-box{ border:1px solid rgba(0,0,0,.06); background:#fffdf9; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:none; }
-
     .redirect-overlay{ position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(135deg, rgba(123,30,34,.9), rgba(252,151,0,.8)); z-index:9999; display:none; align-items:center; justify-content:center; }
     .redirect-message{ background:#fff; padding:2.5rem; border-radius:16px; text-align:center; box-shadow:0 20px 40px rgba(0,0,0,.3); border:3px solid #ffd100; }
     .redirect-spinner{ color:#7B1E22!important; width:3rem; height:3rem; }
@@ -134,7 +119,6 @@
   </style>
   {% endif %}
 </head>
-
 <body>
 <div class="page-wrap">
   <!-- Header -->
@@ -150,7 +134,6 @@
           {% else %}
             <span class="badge-code">KP-{{ form_id }}</span>
           {% endif %}
-
           <span>— {{ header.2|default:header.1 }}</span>
           {% if submission_id %}
             <span class="ms-1">Editing submission
@@ -166,100 +149,85 @@
       </a>
     </div>
   </div>
-
   <!-- Builder card -->
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-2"><i class="bi bi-ui-checks-grid text-warning"></i><strong>Fill out fields</strong></div>
       <div class="small subtle">Case <span class="badge-code"><span class="hash">#</span>{{ case_id }}</span></div>
     </div>
-
     <div class="card-body">
-
       {% if kp8_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i><strong>Please set the Hearing Date, Hearing Time, and Notified this</strong></div>
         <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong>, <strong>Hearing Time</strong>, and <strong>Notified this</strong> date.</div>
       </div>
       {% endif %}
-
       {% if kp10_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-week" style="font-size:1.1rem;"></i><strong>Set the Hearing Details, Time, and Addressed To</strong></div>
         <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 10</strong>, choose the <strong>Hearing Details (date)</strong>, the <strong>Hearing Time</strong>, and search a person for <strong>Addressed To</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp11_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-people" style="font-size:1.1rem;"></i><strong>Select the Pangkat Member</strong></div>
         <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 11</strong>, search and pick the <strong>Pangkat Member Name</strong>. Other fields are auto-filled.</div>
       </div>
       {% endif %}
-
       {% if kp12_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-clock-history" style="font-size:1.1rem;"></i><strong>Fill only the Created Day and Time</strong></div>
         <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 12</strong>, just set <strong>Date Created (day)</strong> and <strong>Time Created</strong>. Other fields are auto-filled.</div>
       </div>
       {% endif %}
-
       {% if kp13_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-send-check" style="font-size:1.1rem;"></i><strong>Fill only: Subpoena To, Witness, Appearance Date &amp; Time</strong></div>
         <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 13</strong>, only these four fields are required and shown.</div>
       </div>
       {% endif %}
-
       {% if kp14_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-text" style="font-size:1.1rem;"></i><strong>Everything is already filled.</strong></div>
         <div class="mt-1" style="opacity:.95">Click <strong>Submit &amp; Generate PDF</strong> to create the <strong>Agreement for Arbitration</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp15_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-award" style="font-size:1.1rem;"></i><strong>Fill only the Award Description</strong></div>
         <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 15</strong>, only the <strong>Award Description</strong> field is editable. All other fields are pre-filled and readonly.</div>
       </div>
       {% endif %}
-
       {% if kp16_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-text" style="font-size:1.1rem;"></i><strong>Settlement Agreement Documentation</strong></div>
         <div class="mt-1" style="opacity:.95">Fill in: <strong>Complainant(s)</strong>, <strong>Respondent(s)</strong>, <strong>Barangay Case No.</strong>, <strong>Purpose</strong>, <strong>Settlement Statement</strong>, and <strong>Processed On (Date)</strong>. Other fields are auto-filled.</div>
       </div>
       {% endif %}
-
       {% if kp9_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-text" style="font-size:1.1rem;"></i><strong>Summon for the Respondent (KP-9)</strong></div>
         <div class="mt-1" style="opacity:.95">Fill in the <strong>Made this</strong> date and <strong>Recipient Address</strong>. All other case information is automatically populated.</div>
       </div>
       {% endif %}
-
       {% if kp18_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar-event" style="font-size:1.1rem;"></i><strong>Notice of Hearing</strong></div>
         <div class="mt-1" style="opacity:.95">Set the <strong>Notice Date</strong> and <strong>Notice Time</strong> for the hearing notification. Case details are automatically filled from previous forms and cannot be modified.</div>
       </div>
       {% endif %}
-
       {% if kp19_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle" style="font-size:1.1rem;"></i><strong>Failure to Appear</strong></div>
         <div class="mt-1" style="opacity:.95">Set the <strong>Appearance Date</strong> and <strong>Appearance Time</strong> for the failed hearing. Case details are automatically filled from previous forms and cannot be modified.</div>
       </div>
       {% endif %}
-
       {% if kp20_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-check" style="font-size:1.1rem;"></i><strong>Certification to File Action</strong></div>
         <div class="mt-1" style="opacity:.95">All information has been automatically filled and recorded from previous forms. Simply review the details and <strong>Submit & Generate PDF</strong> to create the certification document.</div>
       </div>
       {% endif %}
-
       {% if kp20a_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-check" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO FILE ACTION</strong></div>
@@ -270,7 +238,6 @@
         All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp20b_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-check" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO FILE ACTION</strong></div>
@@ -282,7 +249,6 @@
         All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp21_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-x" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO BAR ACTION (Complainant)</strong></div>
@@ -290,7 +256,6 @@
         All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp22_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-x" style="font-size:1.1rem;"></i><strong>CERTIFICATION TO BAR ACTION (Respondent)</strong></div>
@@ -298,28 +263,24 @@
         All case information has been automatically populated. Simply review and <strong>Submit & Generate PDF</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp23_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-plus" style="font-size:1.1rem;"></i><strong>MOTION FOR EXECUTION</strong></div>
         <div class="mt-1" style="opacity:.95">This form requests the execution of a settlement agreement or arbitration award. All case information has been automatically populated from previous forms and cannot be modified. Simply review the details and <strong>Submit & Generate PDF</strong>.</div>
       </div>
       {% endif %}
-
       {% if kp24_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar-check" style="font-size:1.1rem;"></i><strong>NOTICE OF EXECUTION OF AWARD</strong></div>
         <div class="mt-1" style="opacity:.95">This form notifies parties about the execution of an arbitration award. Case information is automatically populated from previous forms. Only set the <strong>Motion Date</strong> and <strong>Motion Time</strong> for when the execution will take place.</div>
       </div>
       {% endif %}
-
       {% if minutes_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-text" style="font-size:1.1rem;"></i><strong>MINUTES OF HEARING</strong></div>
         <div class="mt-1" style="opacity:.95">Fill in: <strong>Complainant(s)</strong>, <strong>Respondent(s)</strong>, <strong>Barangay Case No.</strong>, <strong>Purpose</strong>, <strong>When</strong>, <strong>What</strong>, <strong>Date Signed</strong>, and <strong>Time Signed</strong>. Other fields are auto-filled.</div>
       </div>
       {% endif %}
-
       {# NEW: KP-9-P2 helper banner (Officer’s Return) #}
       {% if header.0 == 'KP-9-P2' %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
@@ -333,7 +294,6 @@
         </div>
       </div>
       {% endif %}
-
       {% with title=header.2|default:header.1 %}
       {% if title and 'ATTENDANCE' in title|upper %}
       <div class="mb-3">
@@ -357,7 +317,6 @@
       </div>
       {% endif %}
       {% endwith %}
-
       <!-- KP-17 ONLY -->
       <div id="kp17RepudiationCapture" class="kp17-box" hidden>
         <div class="d-flex align-items-center gap-2 mb-2">
@@ -385,7 +344,6 @@
           </div>
         </div>
       </div>
-
       <!-- KP-23 ONLY -->
       <div id="kp23FilerCapture" class="kp17-box" hidden>
         <div class="d-flex align-items-center gap-2 mb-2">
@@ -413,7 +371,6 @@
           </div>
         </div>
       </div>
-
       {# NEW: KP-9-P2 Mode of Service (1–4) helper block #}
       {% if header.0 == 'KP-9-P2' %}
       <div id="kp9p2ModeBox" class="kp17-box" style="display:block;">
@@ -448,7 +405,6 @@
         </div>
       </div>
       {% endif %}
-
       <!-- Add Person Button for MED-ATT-2025 -->
       {% if header.0 == 'MED-ATT-2025' %}
       <div class="mb-3" style="display:none;">
@@ -468,13 +424,11 @@
         <div class="form-text mt-1">Picks auto-fill Attendee/Position/Contact fields (1..N). You can still edit them after.</div>
       </div>
       {% endif %}
-
       <form id="formFields" class="needs-validation" novalidate autocomplete="off">
         {% csrf_token %}
         <input type="hidden" name="case_id" value="{{ case_id }}">
         <input type="hidden" name="form_id" value="{{ form_id }}">
         {% if submission_id %}<input type="hidden" name="submission_id" value="{{ submission_id }}">{% endif %}
-
         <div class="row g-3">
           {% with 1 as page %}
           {% for kff_id, field_id, label, type_name, is_required, value, field_code in fields %}
@@ -488,7 +442,7 @@
                   {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
                   {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 and field_id != 1143 %} kp-offscreen{% endif %}
-                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' and field_id != 1143 %} kp-offscreen{% endif %}
+                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' and code != 'processed_on_time' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
                   {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' and field_id != 1143 %} kp-offscreen{% endif %}
@@ -525,7 +479,7 @@
                   {% if header.0 == 'KP-9-P2' and 'Date' in label and 'Time' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Recipient Address' in label %} kp-offscreen{% endif %}
                   {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 and field_id != 1143 %} kp-offscreen{% endif %}
-                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' and field_id != 1143 %} kp-offscreen{% endif %}
+                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' and code != 'processed_on_time' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
                   {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' and field_id != 1143 %} kp-offscreen{% endif %}
@@ -574,9 +528,14 @@
                         label-req
                       {% endif %}
                     {% endif %}"
-                    for="f_{{ field_id }}">{{ label }}</label>
-
-                  {% if type_name == "TEXT" %}
+                    for="f_{{ field_id }}">{% if form_id == 8 and field_id == 1143 or form_id == 9 and field_id == 1143 %}Hearing Session{% else %}{{ label }}{% endif %}</label>
+                  {% if form_id == 9 and code == 'processed_on_time' %}
+                    <input id="f_{{ field_id }}" type="time" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           data-saved-time="{{ value|default:'' }}" value="" step="60"
+                           {% if is_required %}required{% endif %}>
+                    <div class="form-text">Prints after the year in the PDF, for example @12:00 PM.</div>
+                  {% elif type_name == "TEXT" %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
@@ -659,7 +618,6 @@
         </div>
       </form>
     </div>
-
     <div class="sticky-actions">
       <div class="hint"><i class="bi bi-info-circle me-1"></i> Please ensure that all information and fields have been thoroughly reviewed and verified.</div>
       <div class="d-flex gap-2">
@@ -670,7 +628,7 @@
         </button> -->
         <button id="submitBtn" class="btn btn-brand">
           <span class="when-idle">
-            <i class="bi bi-check2-square me-1"></i> 
+            <i class="bi bi-check2-square me-1"></i>&#x20;
             {% if submission_id %}Save Changes &amp; Regenerate PDF{% else %}Submit &amp; Generate PDF{% endif %}
           </span>
           <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> {% if submission_id %}Saving…{% else %}Submitting…{% endif %}</span>
@@ -679,7 +637,6 @@
     </div>
   </div>
 </div>
-
 <!-- Toasts -->
 <div class="toast-container position-fixed top-0 end-0 p-3">
   <div id="toastOk" class="toast align-items-center text-bg-success border-0" role="alert">
@@ -695,7 +652,6 @@
     </div>
   </div>
 </div>
-
 <!-- Confirm Submit modal -->
 <div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -721,7 +677,6 @@
     </div>
   </div>
 </div>
-
 <!-- Staff picker modal -->
 <div class="modal" tabindex="-1" id="staffPicker" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
@@ -740,7 +695,6 @@
     </div>
   </div>
 </div>
-
 <!-- Resident picker modal -->
 <div class="modal" tabindex="-1" id="residentPicker" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
@@ -759,7 +713,6 @@
     </div>
   </div>
 </div>
-
 <!-- Redirect loading overlay -->
 <div id="redirectOverlay" class="redirect-overlay">
   <div class="redirect-message">
@@ -768,7 +721,6 @@
     <p class="redirect-text mb-0">Taking you back to the previous page</p>
   </div>
 </div>
-
 <!-- Runtime config for the external JS -->
 <script id="fb-config" type="application/json">
 {
@@ -813,11 +765,34 @@
   }
 }
 </script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% if form_id == 9 %}
+<script>
+// Restore both native HH:MM values and older saved AM/PM values in the time picker.
+(function kp9ProcessedTimeInput(){
+  const input = document.querySelector('#formFields input[data-code="processed_on_time"]');
+  if (!input) return;
+  const raw = (input.dataset.savedTime || '').trim().replace(/^@\s*/, '');
+  if (!raw || raw.toLowerCase() === 'null') return;
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2})(?:\.\d{1,6})?)?\s*([AP]M)?$/i);
+  if (!match) return;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  const second = Number(match[3] || 0);
+  const meridiem = (match[4] || '').toUpperCase();
+  if (minute > 59 || second > 59) return;
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return;
+    hour = (hour % 12) + (meridiem === 'PM' ? 12 : 0);
+  } else if (hour > 23 || !match[2]) {
+    return;
+  }
+  input.value = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+})();
+</script>
+{% endif %}
 <!-- Your existing JS file; untouched -->
 <script src="{% static 'js/form_builder.js' %}"></script>
-
 <!-- Staff autocomplete for Lupon Tagapamayapa field -->
 <script>
 (function(){
@@ -826,12 +801,10 @@
     const wrap = document.querySelector(`[data-code="${code}"]`);
     const input = document.querySelector(`[data-code="${code}"] input, input[data-code="${code}"]`);
     if(!wrap || !input) return;
-    
     wrap.classList.add('typeahead-wrap');
     const dd = document.createElement('div');
     dd.className = 'typeahead-dropdown';
     wrap.appendChild(dd);
-    
     let t=null, items=[];
     function open(){ dd.style.display='block'; }
     function close(){ dd.style.display='none'; dd.innerHTML=''; items=[]; }
@@ -845,7 +818,6 @@
         .then(r=>r.json()).then(j=>{items=j.results||[]; render(items);}).catch(()=>close());
     }
     function choose(i){ const row=items[i]; if(!row) return; input.value=row.name; close(); input.dispatchEvent(new Event('change',{bubbles:true})); }
-    
     input.addEventListener('input', ()=>{
       const q=input.value.trim(); if(q.length<2){ close(); return; }
       clearTimeout(t); t=setTimeout(()=>fetchQ(q),180);
@@ -856,7 +828,6 @@
     document.addEventListener('click', e=>{ if(!dd.contains(e.target) && e.target!==input) close(); });
   });
 })();
-
 // Auto-fill Printed Name from Complainant Name
 (function(){
   const complName = document.querySelector('[data-field-id="1"]');
@@ -870,7 +841,6 @@
     complName.addEventListener('blur', sync);
     // Initial sync on page load
     if(complName.value) sync();
-    
     // Hide Printed Name field for form 35 (MON-COMPL)
     const formId = {{ form_id|default:"0" }};
     if(formId === 35){
@@ -878,7 +848,6 @@
       if(printedWrapper) printedWrapper.style.display = 'none';
     }
   }
-  
   // Hide Processed On (Date) for form 35
   const formId = {{ form_id|default:"0" }};
   if(formId === 35){
@@ -888,7 +857,6 @@
       if(wrapper) wrapper.style.display = 'none';
     }
   }
-  
   // Hide Date & Time Filed for form 7 (KP-7)
   if(formId === 7){
     const dateTimeFiled = document.querySelector('[data-field-id="1129"]');
@@ -897,10 +865,110 @@
       if(wrapper) wrapper.style.display = 'none';
     }
   }
+  // KP-8: update the notification date label and example placeholder.
+  if (formId === 8) {
+    document.querySelectorAll('#formFields .kp-field').forEach(function(field) {
+      const label = field.querySelector('label');
+      if (!label) return;
+      const code = (field.dataset.code || '').toLowerCase();
+      if (code !== 'notified_date' &&
+          !/^Notified\s+this\b/i.test(label.textContent.trim())) return;
+      label.textContent = 'Notified this: (mm/dd/yyyy @00:00 AM/PM)';
+      const input = field.querySelector('input, textarea');
+      if (input) input.placeholder = '01/13/2004 @12:37 AM';
+    });
+  }
+})();
+</script>
+
+<!-- Person picker modal -->
+<div class="modal" tabindex="-1" id="personPicker" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add person attendee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group mb-2">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" id="personSearch" placeholder="Search person by name…">
+        </div>
+        <div id="personResults" class="list-group"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// Person picker functionality
+(function(){
+  let addedPersons=[];
+  let personCounter=1;
+  const personModal = document.getElementById('personPicker');
+  const btnAddPerson = document.getElementById('btnAddPerson');
+  const btnClearPerson = document.getElementById('btnClearPerson');
+  const personSearch = document.getElementById('personSearch');
+  const personResults = document.getElementById('personResults');
+  if(btnAddPerson){
+    btnAddPerson.addEventListener('click',function(){
+      new bootstrap.Modal(personModal).show();
+    });
+  }
+  if(btnClearPerson){
+    btnClearPerson.addEventListener('click',function(){
+      addedPersons=[];
+      personCounter=1;
+      const l=document.getElementById('addedPersonsList');
+      if(l)l.innerHTML='';
+      document.querySelectorAll('[data-field-code^="person_"],[data-field-code^="pos_"],[data-field-code^="contact_"],[data-field-code="position_one"]').forEach(f=>{
+        f.value='';
+        f.dispatchEvent(new Event('change',{bubbles:true}));
+      });
+    });
+  }
+  if(personSearch){
+    personSearch.addEventListener('input',function(e){
+      const q=e.target.value.trim();
+      if(q.length<2){personResults.innerHTML='';return;}
+      fetch(`/lupon_mem/person_suggest/?q=${encodeURIComponent(q)}`).then(r=>r.json()).then(data=>{
+        personResults.innerHTML='';
+        if(data.results&&data.results.length>0){
+          data.results.forEach(p=>{
+            const item=document.createElement('a');
+            item.href='#';
+            item.className='list-group-item list-group-item-action';
+            item.innerHTML=`${p.name} <span class="badge bg-secondary">${p.resident_type||'Resident'}</span>`;
+            item.onclick=(ev)=>{
+              ev.preventDefault();
+              addPersonToForm(p);
+              bootstrap.Modal.getInstance(personModal).hide();
+              personSearch.value='';
+              personResults.innerHTML='';
+            };
+            personResults.appendChild(item);
+          });
+        }else{personResults.innerHTML='<div class="p-2 text-muted">No results</div>';}
+      });
+    });
+  }
+  function addPersonToForm(p){
+    if(personCounter>10){alert('Max 10 persons');return;}
+    addedPersons.push(p);
+    const w=['','one','two','three','four','five','six','seven','eight','nine','ten'][personCounter];
+    const pf=document.querySelector(`input[data-field-code="person_${w}"]`);
+    const posf=document.querySelector(`input[data-field-code="${personCounter===1?'position_one':'pos_'+w}"]`);
+    const cf=document.querySelector(`input[data-field-code="contact_${w}"]`);
+    if(pf)pf.value=p.name;
+    if(posf)posf.value=p.resident_type||'Resident';
+    if(cf)cf.value=p.contact_number||'';
+    if(pf)pf.dispatchEvent(new Event('change',{bubbles:true}));
+    if(posf)posf.dispatchEvent(new Event('change',{bubbles:true}));
+    if(cf)cf.dispatchEvent(new Event('change',{bubbles:true}));
+    personCounter++;
+    const l=document.getElementById('addedPersonsList');
+    if(l)l.innerHTML='<small class="text-muted">Added:</small><br>'+addedPersons.map((p,i)=>`<span class="badge bg-success me-1">${i+1}. ${p.name}</span>`).join('');
+  }
 })();
 </script>
 </body>
 </html>
-
-<!-- Person picker modal -->`n<div class="modal" tabindex="-1" id="personPicker" aria-hidden="true">`n  <div class="modal-dialog modal-dialog-scrollable">`n    <div class="modal-content">`n      <div class="modal-header">`n        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add person attendee</h5>`n        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>`n      </div>`n      <div class="modal-body">`n        <div class="input-group mb-2">`n          <span class="input-group-text"><i class="bi bi-search"></i></span>`n          <input type="text" class="form-control" id="personSearch" placeholder="Search person by name�">`n        </div>`n        <div id="personResults" class="list-group"></div>`n      </div>`n    </div>`n  </div>`n</div>`n`n<script>`n// Person picker functionality`n(function(){`n  let addedPersons=[];`n  let personCounter=1;`n  const personModal = document.getElementById('personPicker');`n  const btnAddPerson = document.getElementById('btnAddPerson');`n  const btnClearPerson = document.getElementById('btnClearPerson');`n  const personSearch = document.getElementById('personSearch');`n  const personResults = document.getElementById('personResults');`n  `n  if(btnAddPerson){`n    btnAddPerson.addEventListener('click',function(){`n      new bootstrap.Modal(personModal).show();`n    });`n  }`n  `n  if(btnClearPerson){`n    btnClearPerson.addEventListener('click',function(){`n      addedPersons=[];`n      personCounter=1;`n      const l=document.getElementById('addedPersonsList');`n      if(l)l.innerHTML='';`n      document.querySelectorAll('[data-field-code^="person_"],[data-field-code^="pos_"],[data-field-code^="contact_"],[data-field-code="position_one"]').forEach(f=>{`n        f.value='';`n        f.dispatchEvent(new Event('change',{bubbles:true}));`n      });`n    });`n  }`n  `n  if(personSearch){`n    personSearch.addEventListener('input',function(e){`n      const q=e.target.value.trim();`n      if(q.length<2){personResults.innerHTML='';return;}`n      fetch(`/lupon_mem/person_suggest/?q=${encodeURIComponent(q)}`).then(r=>r.json()).then(data=>{`n        personResults.innerHTML='';`n        if(data.results&&data.results.length>0){`n          data.results.forEach(p=>{`n            const item=document.createElement('a');`n            item.href='#';`n            item.className='list-group-item list-group-item-action';`n            item.innerHTML=`${p.name} <span class="badge bg-secondary">${p.resident_type||'Resident'}</span>`;`n            item.onclick=(ev)=>{`n              ev.preventDefault();`n              addPersonToForm(p);`n              bootstrap.Modal.getInstance(personModal).hide();`n              personSearch.value='';`n              personResults.innerHTML='';`n            };`n            personResults.appendChild(item);`n          });`n        }else{personResults.innerHTML='<div class="p-2 text-muted">No results</div>';}`n      });`n    });`n  }`n  `n  function addPersonToForm(p){`n    if(personCounter>10){alert('Max 10 persons');return;}`n    addedPersons.push(p);`n    const w=['','one','two','three','four','five','six','seven','eight','nine','ten'][personCounter];`n    const pf=document.querySelector(`input[data-field-code="person_${w}"]`);`n    const posf=document.querySelector(`input[data-field-code="${personCounter===1?'position_one':'pos_'+w}"]`);`n    const cf=document.querySelector(`input[data-field-code="contact_${w}"]`);`n    if(pf)pf.value=p.name;`n    if(posf)posf.value=p.resident_type||'Resident';`n    if(cf)cf.value=p.contact_number||'';`n    if(pf)pf.dispatchEvent(new Event('change',{bubbles:true}));`n    if(posf)posf.dispatchEvent(new Event('change',{bubbles:true}));`n    if(cf)cf.dispatchEvent(new Event('change',{bubbles:true}));`n    personCounter++;`n    const l=document.getElementById('addedPersonsList');`n    if(l)l.innerHTML='<small class="text-muted">Added:</small><br>'+addedPersons.map((p,i)=>`<span class="badge bg-success me-1">${i+1}. ${p.name}</span>`).join('');`n  }`n})();`n</script>
-

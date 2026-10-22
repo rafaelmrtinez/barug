@@ -220,14 +220,7 @@
               {% endif %}
             </td>
             <td class="text-muted">
-              {% if f.4 %}
-                <div>{{ f.4 }}</div>
-                {% if f.5 or f.6 %}
-                  <div class="small">{{ f.5|default:"" }}{% if f.5 and f.6 %}&nbsp;{% endif %}{{ f.6|default:"" }}</div>
-                {% endif %}
-              {% else %}
-                —
-              {% endif %}
+              {% if f.4 %}{{ f.4 }}{% else %}—{% endif %}
             </td>
             <td class="text-end">
               <div class="d-flex gap-1 justify-content-end">

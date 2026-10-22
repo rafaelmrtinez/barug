@@ -4,8 +4,10 @@ from typing import Dict, Set, Any
 from datetime import date as _date, datetime as _dt, time as _time
 import json
 import logging
+import re
 
 from .. import form_shared as FS
+from django.core.exceptions import ValidationError
 from django.db import connection  # DB lookups (PB name, case data)
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,7 @@ _KP8_FIELDS = [
     "appearance_date", "appearance_month", "appearance_year", "appearance_time",
     # "This __ day of ____, ____" line (we fill day → month → year)
     "date_created", "month_created", "year_created",
-    # "Notified this ____ day of ____, ____" (month → day → year; CURRENT DATE)
+    # "Notified this ____ day of ____, ____" (month → day → year, with optional time)
     "date_notified", "month_notified", "year_notified",
     # signature
     "brgy_capt",
@@ -56,7 +58,8 @@ class KP8Handler:
     KP-8: NOTICE OF HEARING (MEDIATION PROCEEDINGS)
 
     Rules implemented:
-      • "Notified this ____ day of ____, ____" → TODAY (Month, Day, Year).
+      • "Notified this ____ day of ____, ____" → processed_on_date
+        (Month, Day, Year @time). A blank value keeps the current-date default.
       • "This __ day of ____, ____" line → day → month → year.
       • Hearing "at ____ o'clock" → normalized to HH:MM.
         Fallback chain: appearance_time (answer) → case.time_filed → case.incident_time.
@@ -77,6 +80,55 @@ class KP8Handler:
             except Exception:
                 pass
         return None
+
+    @staticmethod
+    def _parse_date_and_time(value: Any) -> tuple[_date | None, str]:
+        """
+        Parse the notification date and its optional time together.
+
+        Examples:
+          '01/13/2026 2:00 PM' -> (date(2026, 1, 13), '2:00 PM')
+          '01/13/2026 2:00 pm' -> (date(2026, 1, 13), '2:00 PM')
+          '2026-01-13T14:00'   -> (date(2026, 1, 13), '2:00 PM')
+          '01/13/2026'         -> (date(2026, 1, 13), '')
+
+        An invalid nonempty value returns (None, ''). The caller reports it
+        rather than replacing the supplied date with today's date.
+        """
+        if isinstance(value, _dt):
+            return value.date(), value.strftime("%I:%M %p").lstrip("0")
+        if isinstance(value, _date):
+            return value, ""
+
+        raw = " ".join(FS.sanitize_text(value).split())
+        if not raw:
+            return None, ""
+
+        # Split only once, keeping the space before AM/PM in the time part.
+        # Also accept the 'T' from datetime-local inputs and an optional '@'.
+        parts = re.split(r"[Tt@\s]+", raw, maxsplit=1)
+        date_text = parts[0]
+        parsed_date = KP8Handler._try_parse_date(date_text)
+        if parsed_date is None:
+            try:
+                parsed_date = _dt.strptime(date_text, "%Y/%m/%d").date()
+            except ValueError:
+                return None, ""
+
+        if len(parts) == 1:
+            return parsed_date, ""
+
+        time_text = parts[1].strip().upper()
+        for fmt in (
+            "%I:%M %p", "%I:%M%p", "%I %p", "%I%p",
+            "%I:%M:%S %p", "%I:%M:%S%p", "%H:%M", "%H:%M:%S",
+        ):
+            try:
+                parsed_time = _dt.strptime(time_text, fmt)
+                return parsed_date, parsed_time.strftime("%I:%M %p").lstrip("0")
+            except ValueError:
+                continue
+        return None, ""
 
     @staticmethod
     def _parts_from_value(v: str | None):
@@ -302,20 +354,31 @@ class KP8Handler:
         if not (out.get("recipient") or "").strip() and respondents_val:
             out["recipient"] = respondents_val.split(",")[0].strip()
 
-        # --- CURRENT date for "Notified this … day of …, …"
-        # --- Use processed_on_date for "Notified this … day of …, …" instead of current date
-        processed_date = None
+        # --- Notification date/time from processed_on_date.
+        # Example: 01/13/2026 2:00 PM -> January day of 13, 2026 @2:00 PM.
+        # The PDF has no separate notification-time widget, so append the
+        # optional time to year_notified, which has room for both values.
         processed_date_raw = _find_any({"processed_on_date", "processed on date", "processed_date", "date_processed"})
+        processed_time = ""
         if processed_date_raw:
-            processed_date = self._try_parse_date(processed_date_raw)
-        
-        # Fallback to current date if no processed_on_date is provided
-        if not processed_date:
+            processed_date, processed_time = self._parse_date_and_time(processed_date_raw)
+            if processed_date is None:
+                raise ValidationError(
+                    "Invalid KP8 notification date/time. Use MM/DD/YYYY, "
+                    "optionally followed by a time, for example: "
+                    "01/13/2026 2:00 PM."
+                )
+        else:
+            # Preserve the existing default only when no value was supplied.
             processed_date = _date.today()
-            
-        out["date_notified"]  = f"{processed_date.day:02d}"   # Day (number with leading zero)
-        out["month_notified"]  = processed_date.strftime("%B")   # Month name
-        out["year_notified"]  = str(processed_date.year)        # Year
+
+        # These PDF widget names are positional: the requested wording is
+        # "Notified this <MONTH> day of <DAY>, <YEAR> @<TIME>".
+        out["date_notified"] = processed_date.strftime("%B")
+        out["month_notified"] = f"{processed_date.day:02d}"
+        out["year_notified"] = str(processed_date.year)
+        if processed_time:
+            out["year_notified"] += f" @{processed_time}"
 
         # --- "This __ day of ____, ____" (we fill DAY → MONTH → YEAR)
         # Prefer any provided date parts; else fall back to Date Filed (case) → today.

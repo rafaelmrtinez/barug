@@ -231,6 +231,17 @@ def submit_form(request: HttpRequest):
             staff_id = int(staff_id_raw)
             with transaction.atomic():
                 with connection.cursor() as cur:
+                    # KP-9 uses the time entered in its form, including a blank value.
+                    # Do not replace that answer with an automatic audit timestamp.
+                    cur.execute("""
+                        SELECT kf.form_code
+                        FROM blotter_kp_submission s
+                        JOIN kp_form kf ON kf.form_id = s.form_id
+                        WHERE s.submission_id = %s
+                    """, [submission_id])
+                    form_row = cur.fetchone()
+                    is_kp9 = bool(form_row and (form_row[0] or "").strip().upper() == "KP-9")
+
                     # Fetch staff display info
                     cur.execute("""
                         SELECT
@@ -264,6 +275,8 @@ def submit_form(request: HttpRequest):
                         "processed_on_date": now.date().isoformat(),
                         "processed_on_time": now.strftime("%I:%M %p").lstrip("0").lower(),
                     }
+                    if is_kp9:
+                        values_map.pop("processed_on_time", None)
 
                     cur.execute(
                         "SELECT field_code, field_id FROM kp_field WHERE field_code IN %s",
