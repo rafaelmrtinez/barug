@@ -857,6 +857,16 @@
       if(wrapper) wrapper.style.display = 'none';
     }
   }
+  // Hide Processed On (Time) on the case 31, form 35 build page.
+  if (window.location.pathname === '/lupon_mem/cases/31/forms/35/build/') {
+    document.querySelectorAll('#formFields .kp-field').forEach((field) => {
+      const label = field.querySelector('label');
+      if (field.dataset.code !== 'processed_on_time' &&
+          (!label || label.textContent.trim().toLowerCase() !== 'processed on (time)')) return;
+      const wrapper = field.closest('.col-12, .col-md-6');
+      if (wrapper) wrapper.style.display = 'none';
+    });
+  }
   // Hide Date & Time Filed for form 7 (KP-7)
   if(formId === 7){
     const dateTimeFiled = document.querySelector('[data-field-id="1129"]');
