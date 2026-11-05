@@ -1,5 +1,0 @@
-Line 318 (TEXTAREA):
-{% if kp18_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'notice_date' and code != 'notice_time' and code != 'this_date' and code != 'date_notified' %} kp-offscreen{% endif %}
-
-Line 348 (col-md-6):
-{% if kp18_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'notice_date' and code != 'notice_time' and code != 'this_date' and code != 'date_notified' %} kp-offscreen{% endif %}
