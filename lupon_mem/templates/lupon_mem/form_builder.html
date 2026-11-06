@@ -88,6 +88,8 @@
   {% if form_id == 7 %}
   <style>
     .col-12:has([data-field-id="1121"]),.col-md-6:has([data-field-id="1121"]){display:block!important;}
+    #formFields .col-12:has([data-field-id="1136"]) { display: block !important; }
+    #formFields .col-12:has([data-field-id="1135"]) { display: none !important; }
   </style>
   {% endif %}
   {% if form_id == 8 %}
@@ -111,6 +113,14 @@
   <style>
     /* Show number field (1143) for forms 8, 9, 12, 42, 33, 34 */
     [data-field-id="1143"],.col-12:has([data-field-id="1143"]),.col-md-6:has([data-field-id="1143"]){display:block!important;}
+  </style>
+  {% endif %}
+  {% if form_id == 42 %}
+  <style>
+    #kp9p2ModeBox:not(:has(#kp9p2_m3:checked)) ~ #formFields [data-kp9p2-proxy-mode="3"],
+    #kp9p2ModeBox:not(:has(#kp9p2_m4:checked)) ~ #formFields [data-kp9p2-proxy-mode="4"] {
+      display: none !important;
+    }
   </style>
   {% endif %}
   {% if form_id == 37 %}
@@ -201,7 +211,7 @@
       {% if kp16_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2"><i class="bi bi-file-text" style="font-size:1.1rem;"></i><strong>Settlement Agreement Documentation</strong></div>
-        <div class="mt-1" style="opacity:.95">Fill in: <strong>Complainant(s)</strong>, <strong>Respondent(s)</strong>, <strong>Barangay Case No.</strong>, <strong>Purpose</strong>, <strong>Settlement Statement</strong>, and <strong>Processed On (Date)</strong>. Other fields are auto-filled.</div>
+        <div class="mt-1" style="opacity:.95">Fill in: <strong>Complainant(s)</strong>, <strong>Respondent(s)</strong>, <strong>Barangay Case No.</strong>, <strong>Purpose</strong>, <strong>Settlement Statement</strong>, {% if form_id == 16 %}<strong>Processed On (Date)</strong>, and <strong>Processed On (Time)</strong>{% else %}and <strong>Processed On (Date)</strong>{% endif %}. Other fields are auto-filled.</div>
       </div>
       {% endif %}
       {% if kp9_ui_minimal %}
@@ -434,7 +444,7 @@
           {% for kff_id, field_id, label, type_name, is_required, value, field_code in fields %}
             {% with field_code|lower as code %}
               {% if type_name == "TEXTAREA" %}
-                <div class="col-12
+                <div class="col-12{% if form_id != 42 or code != 'date_time_field' %}
                   {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'served_to' in code and code != 'served_to' %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'offcr_ret' in code %} kp-offscreen{% endif %}
@@ -448,7 +458,9 @@
                   {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
                   {% if kp14_ui_minimal %} kp-offscreen{% endif %}
-                  {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' and field_id != 33 %} kp-offscreen{% endif %}
+                  {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' and field_id != 33 %}
+                    {% if form_id != 16 or code != 'date_time_field' %} kp-offscreen{% endif %}
+                  {% endif %}
                   {% if kp17_ui_minimal and field_id != 665 and field_id != 839 and field_id != 903 and field_id != 685 and field_id != 766 and field_id != 757 %} kp-offscreen{% endif %}
                   {% if kp18_ui_minimal and field_id != 1 and field_id != 2 and field_id != 259 and field_id != 169 and field_id != 852 and field_id != 774 and field_id != 296 and field_id != 230 %} kp-offscreen{% endif %}
                   {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' and code != 'this_date' and code != 'date_notified' %} kp-offscreen{% endif %}
@@ -460,9 +472,10 @@
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
                   {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' and field_id != 1143 %} kp-offscreen{% endif %}
-                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %} kp-offscreen{% endif %}">
+                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %}
+                    {% if form_id != 7 or code != 'date_time_field' and code != 'recipient_address' and field_id != 1136 %} kp-offscreen{% endif %}{% endif %}{% endif %}">
               {% else %}
-                <div class="col-12 col-md-6
+                <div class="col-12 col-md-6{% if form_id != 42 or code != 'date_time_field' %}
                   {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'served_to' in code and code != 'served_to' %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'offcr_ret' in code %} kp-offscreen{% endif %}
@@ -485,7 +498,9 @@
                   {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
                   {% if kp14_ui_minimal %} kp-offscreen{% endif %}
-                  {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' and field_id != 33 %} kp-offscreen{% endif %}
+                  {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' and field_id != 33 %}
+                    {% if form_id != 16 or code != 'date_time_field' %} kp-offscreen{% endif %}
+                  {% endif %}
                   {% if kp17_ui_minimal and field_id != 665 and field_id != 839 and field_id != 903 and field_id != 685 and field_id != 766 and field_id != 757 %} kp-offscreen{% endif %}
                   {% if kp18_ui_minimal and field_id != 1 and field_id != 2 and field_id != 259 and field_id != 169 and field_id != 852 and field_id != 774 and field_id != 296 and field_id != 230 %} kp-offscreen{% endif %}
                   {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' and code != 'this_date' and code != 'date_notified' %} kp-offscreen{% endif %}
@@ -497,7 +512,8 @@
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
                   {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' and field_id != 1143 %} kp-offscreen{% endif %}
-                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %} kp-offscreen{% endif %}">
+                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %}
+                    {% if form_id != 7 or code != 'date_time_field' and code != 'recipient_address' and field_id != 1136 %} kp-offscreen{% endif %}{% endif %}{% endif %}">
               {% endif %}
                 <div class="kp-field" data-code="{{ code }}">
                   <label class="form-label
@@ -515,7 +531,7 @@
                       {% elif kp9_ui_minimal %}
                         {% if field_id == 189 or field_id == 1133 %} label-req {% endif %}
                       {% elif kp16_ui_minimal %}
-                        {% if code == 'complainants' or code == 'respondents' or code == 'brgy_case_num' or code == 'purpose' or code == 'settlement_statement' or code == 'processed_on_date' %} label-req {% endif %}
+                        {% if code == 'complainants' or code == 'respondents' or code == 'brgy_case_num' or code == 'purpose' or code == 'settlement_statement' or code == 'processed_on_date' or form_id == 16 and code == 'date_time_field' %} label-req {% endif %}
                       {% elif kp18_ui_minimal %}
                         {% if code == 'notice_date' or code == 'notice_time' %} label-req {% endif %}
                       {% elif kp19_ui_minimal %}
@@ -528,13 +544,53 @@
                         label-req
                       {% endif %}
                     {% endif %}"
-                    for="f_{{ field_id }}">{% if form_id == 8 and field_id == 1143 or form_id == 9 and field_id == 1143 %}Hearing Session{% else %}{{ label }}{% endif %}</label>
-                  {% if form_id == 9 and code == 'processed_on_time' %}
-                    <input id="f_{{ field_id }}" type="time" class="form-control"
-                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                           data-saved-time="{{ value|default:'' }}" value="" step="60"
+                    {% if form_id == 7 and label|slugify == 'made-this' %}data-kp7-made-this {% endif %}for="f_{{ field_id }}">{% if form_id == 7 and code == 'date_time_field' %}
+                      Time Processed (@xx:xx AM/PM)
+                    {% elif form_id == 16 and code == 'date_time_field' %}
+                      Time Processed (@xx:xx AM/PM):
+                    {% elif form_id == 42 and code == 'date_time_field' %}
+                      Time Processed ( xx:xx AM/PM )
+                    {% elif form_id == 7 and field_id == 1129 %}
+                      Date &amp; Time the Case Filed (mm/dd/yyyy @xx:xx AM/PM):
+                    {% elif form_id == 7 and code == 'recipient_address' %}
+                      Address of the Respondent
+                    {% elif form_id == 7 and field_id == 1136 %}
+                      Address of the Complainant
+                    {% elif form_id == 7 and label|slugify == 'date-received-filed' %}
+                      Date Received &amp; Filed: (mm/dd/yyyy)
+                    {% elif form_id == 7 and label|slugify == 'made-this' %}
+                      Made This: (mm/dd/yyyy)
+                    {% elif form_id == 42 and field_id == 1143 %}
+                      Mediation/Concilliation Session (eg. 1st Mediation)
+                    {% elif form_id == 8 and field_id == 1143 or form_id == 9 and field_id == 1143 %}Hearing Session{% else %}{{ label }}{% endif %}</label>
+                  {% if form_id == 7 and label|slugify == 'date-received-filed' %}
+                    <input id="f_{{ field_id }}" type="date" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}" data-kp7-received-date
+                           value="{{ value|date:'Y-m-d'|default:value|default:'' }}"
                            {% if is_required %}required{% endif %}>
+                  {% elif form_id == 7 and code == 'date_time_field' or form_id == 42 and code == 'date_time_field' or form_id == 9 and code == 'processed_on_time' %}
+                    <input id="f_{{ field_id }}" type="{% if form_id == 42 %}text{% else %}time{% endif %}" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           data-saved-time="{{ value|default:'' }}"
+                           {% if form_id == 42 %}value="{{ value|default:'' }}"{% else %}value="" step="60"{% endif %}
+                           {% if is_required %}required{% endif %}>
+                    {% if form_id == 7 or form_id == 42 %}
+                    <div class="gap-2" data-ampm-time-picker hidden>
+                      <select id="f_{{ field_id }}_hour" class="form-select" aria-label="Time Processed hour">
+                        <option value="">Hour</option>
+                      </select>
+                      <select class="form-select" aria-label="Time Processed minute">
+                        <option value="">Minute</option>
+                      </select>
+                      <select class="form-select" aria-label="Time Processed AM or PM">
+                        <option value="">AM/PM</option>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
+                    {% else %}
                     <div class="form-text">Prints after the year in the PDF, for example @12:00 PM.</div>
+                    {% endif %}
                   {% elif type_name == "TEXT" %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
@@ -766,13 +822,18 @@
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-{% if form_id == 9 %}
+{% if form_id == 7 or form_id == 9 or form_id == 42 %}
 <script>
 // Restore both native HH:MM values and older saved AM/PM values in the time picker.
-(function kp9ProcessedTimeInput(){
-  const input = document.querySelector('#formFields input[data-code="processed_on_time"]');
+(function restoreProcessedTime(){
+  const input = document.querySelector('#formFields input[data-saved-time]');
   if (!input) return;
-  const raw = (input.dataset.savedTime || '').trim().replace(/^@\s*/, '');
+  const saved = (input.dataset.savedTime || '').trim().replace(/^@\s*/, '');
+{% if form_id == 7 or form_id == 42 %}
+  const raw = saved.replace(/:(\d)(?!\d)/g, ':0$1');
+{% else %}
+  const raw = saved;
+{% endif %}
   if (!raw || raw.toLowerCase() === 'null') return;
   const match = raw.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2})(?:\.\d{1,6})?)?\s*([AP]M)?$/i);
   if (!match) return;
@@ -787,12 +848,157 @@
   } else if (hour > 23 || !match[2]) {
     return;
   }
-  input.value = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+  const restoredTime = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+  if (input.type === 'time') {
+    input.value = restoredTime;
+  } else {
+    input.dataset.restoredTime = restoredTime;
+  }
+})();
+</script>
+{% endif %}
+{% if form_id == 7 %}
+<script>
+(function arrangeKp7Fields(){
+  const form = document.getElementById('formFields');
+  if (!form) return;
+
+  const column = (selector) => form.querySelector(selector)?.closest('.col-12');
+  for (const [partyId, addressSelector] of [
+    [1, '[data-field-id="1136"]'],
+    [2, '.kp-field[data-code="recipient_address"]'],
+  ]) {
+    const party = column('[data-field-id="' + partyId + '"]');
+    const address = column(addressSelector);
+    if (!party || !address) continue;
+    address.classList.remove('col-md-6');
+    address.classList.add('mt-3');
+    party.append(address);
+  }
+
+  const madeThis = column('[data-kp7-made-this]');
+  const caseFiled = column('[data-field-id="1129"]');
+  if (madeThis && caseFiled) madeThis.after(caseFiled);
+})();
+</script>
+{% endif %}
+{% if form_id == 7 or form_id == 42 %}
+<script>
+(function initDateAndTimePickers(){
+  const pad2 = (value) => String(value).padStart(2, '0');
+{% if form_id == 7 %}
+  const dateInput = document.querySelector('#formFields input[data-kp7-received-date]');
+  if (dateInput) {
+    const saved = dateInput.defaultValue.trim();
+    const yearFirst = saved.match(/^(\d{4})([-/])(\d{1,2})\2(\d{1,2})$/);
+    const monthFirst = saved.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const setDate = (year, month, day) => {
+      dateInput.value = year + '-' + pad2(month) + '-' + pad2(day);
+    };
+
+    if (yearFirst) {
+      setDate(yearFirst[1], yearFirst[3], yearFirst[4]);
+    } else if (monthFirst) {
+      const [, month, day, year] = monthFirst;
+      setDate(year, month, day);
+      // The PDF handler also accepts day/month/year when month/day/year is invalid.
+      if (!dateInput.value) setDate(year, day, month);
+    }
+    dateInput.defaultValue = dateInput.value;
+  }
+{% endif %}
+
+  const timeInput = document.querySelector('#formFields input[data-saved-time]');
+  const picker = timeInput?.nextElementSibling;
+  if (!picker?.matches('[data-ampm-time-picker]')) return;
+
+  const parts = [...picker.querySelectorAll('select')];
+  const [hours, minutes, meridiem] = parts;
+  const isRequired = timeInput.required;
+  for (let hour = 1; hour <= 12; hour++) {
+    hours.add(new Option(pad2(hour), pad2(hour)));
+  }
+  for (let minute = 0; minute < 60; minute++) {
+    minutes.add(new Option(pad2(minute), pad2(minute)));
+  }
+
+  const restoredTime = timeInput.type === 'time' ? timeInput.value : timeInput.dataset.restoredTime;
+  if (restoredTime) {
+    const [hour, minute] = restoredTime.split(':');
+    const hour24 = Number(hour);
+    hours.value = pad2(hour24 % 12 || 12);
+    minutes.value = minute;
+    meridiem.value = hour24 < 12 ? 'AM' : 'PM';
+    parts.forEach((part) => { part.selectedOptions[0].defaultSelected = true; });
+  }
+  timeInput.defaultValue = timeInput.value;
+  parts.forEach((part) => { part.required = isRequired; });
+
+  const label = timeInput.labels[0];
+  if (label) label.htmlFor = hours.id;
+  timeInput.classList.add('visually-hidden');
+  timeInput.tabIndex = -1;
+  timeInput.setAttribute('aria-hidden', 'true');
+  picker.hidden = false;
+  picker.classList.add('d-flex');
+
+  picker.addEventListener('change', () => {
+    // Keep the original data-field-id input as the single value submitted to Django.
+    const complete = parts.every((part) => part.value);
+    const hasSelection = parts.some((part) => part.value);
+    if (!complete) {
+      timeInput.value = '';
+    } else if (timeInput.type === 'time') {
+      const hour24 = Number(hours.value) % 12 + (meridiem.value === 'PM' ? 12 : 0);
+      timeInput.value = pad2(hour24) + ':' + minutes.value;
+    } else {
+      timeInput.value = hours.value + ':' + minutes.value + ' ' + meridiem.value;
+    }
+    timeInput.required = isRequired || hasSelection;
+    parts.forEach((part) => { part.required = timeInput.required; });
+    timeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    timeInput.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  timeInput.form.addEventListener('reset', () => {
+    timeInput.required = isRequired;
+    parts.forEach((part) => { part.required = isRequired; });
+  });
 })();
 </script>
 {% endif %}
 <!-- Your existing JS file; untouched -->
 <script src="{% static 'js/form_builder.js' %}"></script>
+{% if form_id == 42 %}
+<script>
+document.addEventListener('DOMContentLoaded', function arrangeKp9p2Fields() {
+  const row = document.querySelector('#formFields > .row.g-3');
+  if (!row) return;
+
+  const fields = [...row.querySelectorAll('.kp-field')];
+  const columnByLabel = (name) => fields.find((field) => {
+    const label = field.querySelector('label')?.textContent || '';
+    return label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() === name;
+  })?.closest('.col-12');
+
+  const proxyColumns = ['proxy name line 1', 'proxy name line 2'].map(columnByLabel);
+  proxyColumns.forEach((column, index) => {
+    if (column) column.dataset.kp9p2ProxyMode = String(index + 3);
+  });
+
+  const orderedColumns = [
+    row.querySelector('.kp-field[data-code="served_to"]')?.closest('.col-12'),
+    columnByLabel('officer name'),
+    columnByLabel('officer return day'),
+    row.querySelector('.kp-field[data-code="date_time_field"]')?.closest('.col-12'),
+    row.querySelector('[data-field-id="1143"]')?.closest('.col-12'),
+    ...proxyColumns,
+  ];
+  // Move the original inputs so the service-mode and narrative handlers keep their bindings.
+  row.prepend(...orderedColumns.filter((column) => column?.parentElement === row));
+});
+</script>
+{% endif %}
 <!-- Staff autocomplete for Lupon Tagapamayapa field -->
 <script>
 (function(){
@@ -866,14 +1072,6 @@
       const wrapper = field.closest('.col-12, .col-md-6');
       if (wrapper) wrapper.style.display = 'none';
     });
-  }
-  // Hide Date & Time Filed for form 7 (KP-7)
-  if(formId === 7){
-    const dateTimeFiled = document.querySelector('[data-field-id="1129"]');
-    if(dateTimeFiled){
-      const wrapper = dateTimeFiled.closest('.col-12, .col-md-6');
-      if(wrapper) wrapper.style.display = 'none';
-    }
   }
   // KP-8: update the notification date label and example placeholder.
   if (formId === 8) {

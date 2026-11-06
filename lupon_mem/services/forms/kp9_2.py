@@ -103,7 +103,7 @@ class KP9_2Handler:
         if not s:
             return None
         s = s.strip()
-        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%B %d, %Y", "%b %d, %Y"):
             try:
                 return _dt.strptime(s, fmt).date()
             except Exception:
@@ -168,6 +168,27 @@ class KP9_2Handler:
         return f"{mname} {dd}, {yy}"
 
     @staticmethod
+    def _format_processed_time(value) -> str:
+        """Read the saved picker value, including older 24-hour answers."""
+        raw = FS.sanitize_text(value).removeprefix("@").strip()
+        if not raw:
+            return ""
+        for fmt in ("%I:%M %p", "%I:%M%p", "%H:%M", "%H:%M:%S", "%H:%M:%S.%f"):
+            try:
+                return _dt.strptime(raw, fmt).strftime("%I:%M %p")
+            except ValueError:
+                continue
+        return ""
+
+    @classmethod
+    def _format_signed_timestamp(cls, date_text: str, processed_time: str) -> str:
+        # An earlier suffix can be replaced without appending another time.
+        signed_date = cls._try_parse_date(date_text.partition("@")[0])
+        if signed_date is None:
+            return date_text
+        return f"{signed_date:%B} {signed_date.day}, {signed_date.year} @ {processed_time}"
+
+    @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
         try:
             ordered = {k: out.get(k, "") for k in _KP9P2_FIELDS}
@@ -189,7 +210,7 @@ class KP9_2Handler:
         else infer from which single-line target was filled by JS.
         """
         for k in ("service_mode", "mode", "mode_of_service", "service_mode_no"):
-            v = (by_code.get(k) or "").strip()
+            v = FS.sanitize_text(by_code.get(k))
             if v in {"1", "2", "3", "4"}:
                 return v
 
@@ -260,7 +281,7 @@ class KP9_2Handler:
         # Normalize the two Officer's Return date triplets (split Y-m-d if needed)
         self._normalize_triplet(out, "offcret_serve_date", "offcret_serve_month", "offcret_serve_year")
         self._normalize_triplet(out, "date_offcret", "month_offcret", "ofcret_year")
-        
+
         # For modes 3 and 4, copy officer return date to serve date if serve date is empty
         mode = self._detect_mode(by_code, out)
         if mode in ["3", "4"]:
@@ -276,7 +297,7 @@ class KP9_2Handler:
         # Mode-aware behavior (mode already detected above)
         primary = (out.get("served_to") or "").strip()
 
-        # Signatures: only auto-fill date_signed_one; never touch date_signed_two
+        # Use the Officer Return date when a signature date has not been saved.
         sig_full = self._format_full_date(
             out.get("date_offcret", ""),
             out.get("month_offcret", ""),
@@ -285,28 +306,25 @@ class KP9_2Handler:
         if sig_full:
             self._ensure(out, "date_signed_one", sig_full)
 
-        # WHO SIGNS (served_to_3): Always the respondent for modes 3 and 4
-        # served_to_4: proxy name for mode 4, empty for mode 3
-        # date_signed_two: same as date_signed_one for mode 4
+        # The respondent signs the first line. A proxy signs the second in modes 3 and 4.
         if mode in ["1", "2", "3", "4"]:
             self._ensure(out, "served_to_3", primary)
-            
+
         if mode == "3":
             # Mode 3: Left at dwelling with (Name) - served_to_4 gets proxy_name_one
             prox = (out.get("proxy_name_one") or "").strip()
             if prox:
                 out["served_to_4"] = prox
-            # Copy date_signed_one to date_signed_two for mode 3
-            if sig_full:
-                self._ensure(out, "date_signed_two", sig_full)
         elif mode == "4":
             # Mode 4: proxy signs, so served_to_4 gets the proxy name
             prox = (out.get("proxy_name_two") or "").strip()
             if prox:
                 out["served_to_4"] = prox
-            # Copy date_signed_one to date_signed_two for mode 4
-            if sig_full:
-                self._ensure(out, "date_signed_two", sig_full)
+
+        if mode in {"3", "4"}:
+            second_date = sig_full or out["date_signed_one"].partition("@")[0].strip()
+            if second_date:
+                self._ensure(out, "date_signed_two", second_date)
 
         # NOTE: We never auto-fill proxy_name_one/proxy_name_two themselves here.
 
@@ -317,6 +335,12 @@ class KP9_2Handler:
         for k in _KP9P2_FIELDS:
             out.setdefault(k, "")
 
+        # Format the PDF values using the selected time, without changing the saved answers.
+        processed_time = self._format_processed_time(by_code.get("date_time_field"))
+        if processed_time:
+            out["date_signed_one"] = self._format_signed_timestamp(out["date_signed_one"], processed_time)
+            if mode in {"3", "4"}:
+                out["date_signed_two"] = self._format_signed_timestamp(out["date_signed_two"], processed_time)
+
         self._log_fill_map(out)
         return out
-    

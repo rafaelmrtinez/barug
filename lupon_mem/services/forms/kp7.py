@@ -47,6 +47,22 @@ _KP7_SOURCES = {
 }
 
 
+def _format_processed_time(value) -> str:
+    """Format the entered clock time for the received-and-filed line."""
+    raw = FS.sanitize_text(value).removeprefix("@").strip()
+    if not raw:
+        return ""
+
+    for fmt in ("%I:%M %p", "%I:%M%p", "%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(raw, fmt).strftime("%I:%M %p").lstrip("0")
+        except ValueError:
+            continue
+
+    # Older submissions may still contain a full filing timestamp in this field.
+    return ""
+
+
 class KP7Handler:
     """
     KP-7: Complaint Form
@@ -78,11 +94,13 @@ class KP7Handler:
             if isinstance(val, str):
                 val = FS.sanitize_text(val)
             if val not in (None, "", "null"):
-                if label:
+                code = (field_code or "").strip().lower()
+                # Time Processed may still have a legacy Date and Time Filed label.
+                if label and code != "date_time_field":
                     by_label[label.strip().lower()] = val
-                if field_code:
-                    by_code[field_code.strip().lower()] = val
-        
+                if code:
+                    by_code[code] = val
+
         logger.info("[KP7] All answers from DB: %s", {k: v for k, v in by_label.items() if 'date' in k or 'processed' in k})
 
         def _find_any(keys: Set[str]) -> str:
@@ -95,8 +113,12 @@ class KP7Handler:
             return ""
 
         out: Dict[str, str] = {}
+        exact_codes = {"complainants", "respondents", "complainants_2", "kp7_date_time_filed"}
         for target, sources in _KP7_SOURCES.items():
-            out[target] = _find_any(sources)
+            if target in exact_codes and target in by_code:
+                out[target] = FS.normalize(by_code[target])
+            else:
+                out[target] = _find_any(sources)
 
         # Remove "CIVIL CASE - " prefix from purpose if present
         if out.get("purpose") and out["purpose"].startswith("CIVIL CASE - "):
@@ -149,19 +171,19 @@ class KP7Handler:
         logger.info("[KP7] Raw date_created input: '%s'", date_created_val)
         cd, cm, cy = _parts_from_value(date_created_val)
         logger.info("[KP7] Parsed date_created -> day='%s', month='%s', year='%s'", cd, cm, cy)
-        
+
         processed_on_val = out.get("processed_on_date") or ""
         logger.info("[KP7] Raw processed_on_date input: '%s'", processed_on_val)
         pd, pm, py = _parts_from_value(processed_on_val)
         logger.info("[KP7] Parsed processed_on -> day='%s', month='%s', year='%s'", pd, pm, py)
-        
+
         # Date Created fills: date_created, month_created, year_received
         # Use date_created if available, otherwise use today
         if cd and cm and cy:
             made_day, made_month, made_year = cd, cm, cy
         else:
             made_day, made_month, made_year = t_day, t_month, t_year
-        
+
         # Processed On Date fills: date_received, month_received, year_received_2
         # Use processed_on_date if available, otherwise use today (NOT date_created)
         if pd and pm and py:
@@ -176,10 +198,10 @@ class KP7Handler:
         out["date_received"] = recv_month  # PDF field: month name
         out["month_received"] = recv_day   # PDF field: day number
         out["year_received_2"] = recv_year # PDF field: year
-        
-        logger.info("[KP7] Final values -> date_created='%s', month_created='%s', year_received='%s'", 
+
+        logger.info("[KP7] Final values -> date_created='%s', month_created='%s', year_received='%s'",
                     made_month, made_day, made_year)
-        logger.info("[KP7] Final values -> date_received='%s', month_received='%s', year_received_2='%s'", 
+        logger.info("[KP7] Final values -> date_received='%s', month_received='%s', year_received_2='%s'",
                     recv_month, recv_day, recv_year)
 
         # ---------------------------------------------------
@@ -242,7 +264,7 @@ class KP7Handler:
             row = cur2.fetchone()
             if row and row[0]:
                 incident_val = str(row[0])
-        
+
         # Fallback to form fields if no blotter report incident date
         if not incident_val:
             if "incident date" in by_label:
@@ -324,8 +346,8 @@ class KP7Handler:
         else:
             save_out["date_created"] = made_month  # Use month if no date
             logger.info("[KP7] Using month for date_created='%s'", made_month)
-        
-        logger.info("[KP7] Saving to DB: date_created='%s', processed_on_date='%s'", 
+
+        logger.info("[KP7] Saving to DB: date_created='%s', processed_on_date='%s'",
                     save_out.get("date_created"), save_out.get("processed_on_date"))
         FS.save_answers(submission_id, save_out)
         logger.info("[KP7] Auto-filled & saved case_time_filed=%s (submission=%s)", out.get("case_time_filed"), submission_id)
@@ -348,4 +370,18 @@ class KP7Handler:
         except Exception as e:
             logger.warning("[KP7] Failed to send notifications: %s", e)
 
-        return out
+        # Apply PDF widget mappings only after saving the original names and year.
+        pdf_out = out.copy()
+        pdf_out["Text1"] = out["complainants"]
+        pdf_out["respondents_extra"] = out["respondents"]
+        pdf_out["respondents"] = FS.sanitize_text(by_code.get("recipient_address"))
+
+        complainant_address = FS.sanitize_text(by_code.get("contact_one"))
+        pdf_out["complainants"] = complainant_address
+        pdf_out["complainant"] = complainant_address  # Also support the singular widget name.
+
+        processed_time = _format_processed_time(by_code.get("date_time_field"))
+        if processed_time:
+            pdf_out["year_received_2"] = f"{recv_year} @{processed_time}"
+
+        return pdf_out

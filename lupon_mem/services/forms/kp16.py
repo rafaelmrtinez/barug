@@ -25,7 +25,7 @@ _KP16_FIELDS = [
     "settlement_statement",
     "date_entered",            # day (1..31)
     "month_entered",           # full month name
-    "year_entered",            # 4-digit year
+    "year_entered",            # year plus the entered time, e.g., "2026 @11:11 AM"
     "complainants_two",
     "respondents_two",
     "chairman",                # should print Lupon/Pangkat Chairman
@@ -65,7 +65,7 @@ _KP16_SOURCES: Dict[str, Set[str]] = {
     "date_entered":  {"date_entered", "current_date", "this_date", "date_today", "date_created"},
     "month_entered": {"month_entered", "current_month", "month_today", "month_created"},
     "year_entered":  {"year_entered", "current_year", "year_today", "year_created"},
-    
+
     # Processed date (source for date_entered/month_entered/year_entered)
     "processed_on_date": {"processed_on_date", "processed on (date)", "date_processed"},
 
@@ -236,14 +236,16 @@ class KP16Handler:
         by_label: Dict[str, str] = {}
         by_code: Dict[str, str] = {}
         for fid, label, code in rows:
+            code = (code or "").strip().lower()
             val = answers_by_id.get(str(fid))
             if isinstance(val, str):
                 val = FS.sanitize_text(val)
             if val not in (None, "", "null"):
-                if label:
+                # The processed time input may still have a filing-time label in the database.
+                if label and code != "date_time_field":
                     by_label[label.strip().lower()] = val
                 if code:
-                    by_code[code.strip().lower()] = val
+                    by_code[code] = val
 
         def _find_any(keys: Set[str]) -> str:
             for k in keys:
@@ -257,6 +259,9 @@ class KP16Handler:
         out: Dict[str, str] = {}
         for target, sources in _KP16_SOURCES.items():
             out[target] = _find_any(sources)
+
+        # Keep date calculations working with a plain year on repeated renders.
+        out["year_entered"] = out["year_entered"].partition("@")[0].strip()
 
         # Mirror second lines if blank
         if not (out.get("complainants_two") or "").strip():
@@ -287,15 +292,15 @@ class KP16Handler:
         # ---- Date Filed and Time Filed from blotter_case ----
         date_obj: Optional[_date] = None
         time_obj: Optional[_time] = None
-        
+
         # Get date_filed and time_filed directly from blotter_case table
         if isinstance(case_date_by_sub, _date):
             date_obj = case_date_by_sub
         if isinstance(case_time_by_sub, _time):
             time_obj = case_time_by_sub
-        
+
         logger.info("[KP16] Using blotter_case date_filed=%s time_filed=%s", date_obj, time_obj)
-        
+
         # Fallback logic if blotter_case doesn't have the values
         if not date_obj:
             date_answer = (out.get("date_filed") or "").strip()
@@ -330,7 +335,7 @@ class KP16Handler:
                 date_obj = _dt.now(ZoneInfo("Asia/Manila")).date()
 
         out["date_filed"] = self._fmt_full_date(date_obj)
-        
+
         # Use time from blotter_case
         if not time_obj:
             time_obj = case_time_by_num if case_time_by_num else None
@@ -339,11 +344,11 @@ class KP16Handler:
         # ---- entered date trio: extract from processed_on_date if available ----
         now_ph = _dt.now(ZoneInfo("Asia/Manila"))
         today = now_ph.date()
-        
+
         # Check if processed_on_date exists in answers
         processed_date_str = _find_any({"processed_on_date", "processed on (date)", "date_processed"})
         processed_date_obj = self._try_parse_date(processed_date_str) if processed_date_str else None
-        
+
         # Use processed_on_date if available, otherwise use today
         source_date = processed_date_obj if processed_date_obj else today
 
@@ -371,6 +376,12 @@ class KP16Handler:
                 out[k] = FS.sanitize_text(v)
         for k in _KP16_FIELDS:
             out.setdefault(k, "")
+
+        # Use the saved KP-16 Processed On (Time) answer, separate from Time Filed.
+        processed_time_text = FS.sanitize_text(by_code.get("date_time_field"))
+        processed_time = self._parse_time_any(processed_time_text.removeprefix("@").strip())
+        if processed_time is not None:
+            out["year_entered"] += f" @{self._fmt_time_12h(processed_time).upper()}"
 
         # ---------------------------------------------------
         # Send notifications for KP-16 submission
@@ -400,7 +411,7 @@ class KP16Handler:
     def persist_computed(self, *, form_id: int, submission_id: int, case_id: int, out_map: dict) -> None:
         """Save computed values back to the database."""
         import json as _json
-        
+
         # Get field mappings for this form
         with connection.cursor() as cur:
             cur.execute(
@@ -414,22 +425,26 @@ class KP16Handler:
                 [form_id],
             )
             rows = cur.fetchall()
-        
+
         # Create reverse mapping from PDF field names to database field_ids
         field_mapping = {}
         for field_id, label, code in rows:
             label_lower = (label or "").strip().lower()
             code_lower = (code or "").strip().lower()
-            
+            if code_lower == "date_time_field":
+                continue  # Preserve the user's Processed On (Time) answer.
+
             # Map PDF field names to database field_ids
             for pdf_field, source_keys in _KP16_SOURCES.items():
                 if label_lower in source_keys or code_lower in source_keys:
                     field_mapping[pdf_field] = field_id
                     break
-        
+
         # Save computed values to database
         with connection.cursor() as cur:
             for pdf_field, value in out_map.items():
+                if pdf_field == "year_entered" and isinstance(value, str):
+                    value = value.partition("@")[0].strip()
                 if pdf_field in field_mapping and value:
                     field_id = field_mapping[pdf_field]
                     cur.execute(
